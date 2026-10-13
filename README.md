@@ -1,9 +1,7 @@
 # 🎬 IMAX Ticketing Platform — Ecosistema Digital de Cines
 
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)
 ![CI](https://img.shields.io/badge/DB%20CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
 
 Propuesta de licitación para modernizar la plataforma global de venta de entradas de IMAX:
 cartelera, mapa de asientos en tiempo real, pago simulado, emisión de QR únicos, control de
