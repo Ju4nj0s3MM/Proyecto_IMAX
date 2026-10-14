@@ -36,6 +36,41 @@ Flujo Git: trabajar en tu rama → `git pull origin main` antes de empezar → P
 
 ---
 
+## PARTE 0.1 — Cómo ingresar a la página (2 pasos)
+
+La base de la GUI ya está creada en `app/` (HTML + JavaScript, con un servidor Node.js + Express). Requisito: **Node.js 18 o superior** (verificar con `node -v`).
+
+**Paso 1.** Descargar lo último e instalar. En una terminal, en la **raíz del repo**:
+```bash
+git pull origin main
+npm install
+```
+(`npm install` instala todo y crea el archivo `.env` solo.)
+
+**Paso 2.** Arrancar y entrar:
+```bash
+npm run dev
+```
+Abrir **http://localhost:3000** → *Iniciar sesión* → **"Entrar como rol"** y elegir `cliente`, `taquillero`, `operador_sala`, `contador` o `administrador` para ver las pantallas de cada perfil.
+
+**Notas**
+- Funciona **sin base de datos** (modo simulado, `MOCK=true`): el mapa, la cartelera y los pagos usan datos de ejemplo. Cuando existan los scripts SQL, poner `MOCK=false` en `app/.env` y los datos `PG*` de la BD.
+- **Windows/PowerShell:** si sale "la ejecución de scripts está deshabilitada", ejecutar una sola vez `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` y reabrir la terminal (o escribir `npm.cmd` en lugar de `npm`).
+- Si sale "Could not read package.json": la terminal está en la carpeta equivocada. Debe estar en la carpeta donde se ve `package.json` (la raíz del repo, o `app/`).
+- Detalle de endpoints, formas de respuesta y cómo agregar pantallas: `app/README.md`.
+
+**Qué archivos de la app edita cada quien**
+
+| Integrante | Backend | Páginas |
+|---|---|---|
+| Mati | `app/src/routes/catalogo.js` | `app/public/catalogo/*`, `app/public/dashboard.html` |
+| Juanjo | `app/src/routes/venta.js` | `app/public/venta/*` |
+| Brandon | `app/src/routes/seguridad.js` | `app/public/seguridad/*`, `app/public/login.html` |
+
+Archivos compartidos (`server.js`, `src/db.js`, `src/auth.js`, `src/mock.js`, `public/js/*`, `public/css/styles.css`): se cambian avisando al grupo. El menú por rol está en `app/public/js/nav.js`: cada quien agrega ahí sus enlaces.
+
+---
+
 # PARTE 1 — Contexto completo del proyecto (extraído de la especificación)
 
 ## 1.1 Qué es
@@ -269,8 +304,8 @@ Sobre: filtro de cartelera (función activa y futura por fecha/cine/género) y e
 ## Parte de la aplicación
 
 **M6 · Esqueleto y pantallas propias**
-- Elegir el stack (*sugerencia:* Python + FastAPI + `psycopg` y HTML/JS simple) y dejar la estructura de `app/` con conexión a la BD por variables de entorno (sin contraseñas en el repo). Documentar en `app/README.md` cómo correrla.
-- Estructura de rutas/páginas por módulo para que los tres editen archivos distintos sin conflictos.
+- La base de `app/` **ya está creada** (HTML + JavaScript con Node.js + Express + `pg`, ver Parte 0.1). Mati la mantiene: conexión a la BD por variables de entorno (sin contraseñas en el repo), menú por rol en `nav.js` y `app/README.md` al día.
+- La estructura de rutas/páginas por módulo ya separa los archivos de cada quien para evitar conflictos; revisar que se respete.
 - **Cartelera y exploración** (RN-01, RN-02): sinopsis, clasificación, horarios, filtros por ubicación, fecha y género.
 - **Panel de administración de catálogo:** alta de película con póster, configuración de salas y mapa de asientos (mostrar el error de RN-18), programación de funciones (mostrar el error de traslape), matriz de precios y promociones.
 - **Dashboard** con métricas en tiempo real: % de ocupación, ingresos por función (consulta de Juanjo), métodos de pago (consulta de Juanjo) y top de funciones (la suya).
