@@ -1,0 +1,17 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Auditoría</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<main>
+  <h1>Bitácora de auditoría</h1>
+  <div id="msg" class="msg" hidden></div>
+  <div class="card"><table><thead><tr><th>Fecha</th><th>Usuario</th><th>Rol</th><th>Operación</th><th>IP</th></tr></thead><tbody id="filas"></tbody></table></div>
+  <div class="todo"><strong>TODO (Brandon):</strong> reembolsos/anulaciones (POST /api/seguridad/reembolsos) y la consulta #4 agrupada por administrador.</div>
+</main>
+<script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required" data-roles="administrador"></script>
+<script>
+  api('/seguridad/auditoria').then(rows => {
+    document.getElementById('filas').innerHTML = rows.map(r =>
+      `<tr><td>${fmtFecha(r.fecha)}</td><td>${r.usuario_id}</td><td>${r.rol}</td><td>${r.operacion}</td><td>${r.ip}</td></tr>`).join('');
+  }).catch(e => mostrarMensaje(document.getElementById('msg'), e.message, 'err'));
+</script>
+</body></html>

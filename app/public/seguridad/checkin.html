@@ -1,0 +1,25 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Check-in</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<main>
+  <h1>Check-in en puerta</h1>
+  <div class="card row">
+    <label>Código QR <input id="codigo" placeholder="pega o escanea el código" size="30"></label>
+    <label>Puerta <input id="puerta" type="number" value="1" min="1"></label>
+    <button id="validar">Validar entrada</button>
+  </div>
+  <div id="resultado" class="msg" hidden></div>
+</main>
+<script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required" data-roles="operador_sala,administrador"></script>
+<script>
+  // RN-14, RN-15, RN-16. El mensaje lo decide la BD ("Entrada ya utilizada", otra función, fuera de tolerancia).
+  const out = document.getElementById('resultado');
+  document.getElementById('validar').onclick = async () => {
+    try {
+      const r = await api('/seguridad/checkin', { method: 'POST',
+        body: { codigo_qr: document.getElementById('codigo').value.trim(), puerta_id: +document.getElementById('puerta').value } });
+      mostrarMensaje(out, r.mensaje || JSON.stringify(r), r.ok ? 'ok' : 'err');
+    } catch (e) { mostrarMensaje(out, e.message, 'err'); }
+  };
+</script>
+</body></html>

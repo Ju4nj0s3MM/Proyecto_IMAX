@@ -1,0 +1,26 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Mis entradas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script></head>
+<body>
+<main>
+  <h1>Mis entradas</h1>
+  <div id="msg" class="msg" hidden></div>
+  <div id="lista"></div>
+</main>
+<script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required"></script>
+<script>
+  // RN-11, RN-12, RN-13: solo existen boletos si el pago fue aprobado; cada uno con su QR único.
+  api('/venta/mis-boletos').then(boletos => {
+    const cont = document.getElementById('lista');
+    if (!boletos.length) { cont.innerHTML = '<p class="muted">Aún no tienes entradas.</p>'; return; }
+    cont.innerHTML = boletos.map(b => `
+      <div class="card row">
+        <div id="qr-${b.boleto_id}"></div>
+        <div><h3>${b.titulo}</h3>
+          <p class="muted">${b.sala} · asiento ${b.fila}${b.numero} · ${fmtFecha(b.inicio)}</p>
+          <p>Estado: <strong>${b.estado}</strong><br><code>${b.codigo_qr}</code></p></div>
+      </div>`).join('');
+    boletos.forEach(b => new QRCode(document.getElementById('qr-' + b.boleto_id), { text: b.codigo_qr, width: 128, height: 128 }));
+  }).catch(e => mostrarMensaje(document.getElementById('msg'), e.message, 'err'));
+</script>
+</body></html>

@@ -1,0 +1,37 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<main>
+  <h1>Iniciar sesión</h1>
+  <div class="card">
+    <div class="row">
+      <label>Correo <input id="email" type="email"></label>
+      <label>Contraseña <input id="password" type="password"></label>
+      <button id="entrar">Entrar</button>
+    </div>
+    <div id="dev" hidden style="margin-top:16px">
+      <p class="muted">Modo desarrollo (AUTH_DEV_BYPASS): entrar como rol sin contraseña.</p>
+      <div class="row"><label>Rol <select id="rol"></select></label><button class="secondary" id="entrarDev">Entrar como rol</button></div>
+    </div>
+  </div>
+  <div id="msg" class="msg" hidden></div>
+</main>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+  const next = qs('next') || '/index.html';
+  const msg = document.getElementById('msg');
+  async function login(body) {
+    try { await api('/seguridad/login', { method: 'POST', body }); location.href = next; }
+    catch (e) { mostrarMensaje(msg, e.message, 'err'); }
+  }
+  document.getElementById('entrar').onclick = () =>
+    login({ email: document.getElementById('email').value, password: document.getElementById('password').value });
+  document.getElementById('entrarDev').onclick = () => login({ rol: document.getElementById('rol').value });
+  api('/seguridad/config').then(c => {
+    if (!c.devBypass) return;
+    document.getElementById('dev').hidden = false;
+    document.getElementById('rol').innerHTML = c.roles.map(r => `<option>${r}</option>`).join('');
+  });
+</script>
+</body></html>

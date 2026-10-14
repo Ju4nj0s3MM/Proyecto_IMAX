@@ -1,0 +1,17 @@
+{
+  "name": "imax-app",
+  "version": "0.1.0",
+  "description": "GUI de soporte (HTML/JS + Node/Express + PostgreSQL) - Proyecto IMAX",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "mock": "MOCK=true AUTH_DEV_BYPASS=true node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "pg": "^8.12.0"
+  }
+}

@@ -1,0 +1,17 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Cartelera</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<main>
+  <h1>Cartelera</h1>
+  <div class="card row">
+    <label>Cine / ubicación <input id="cine" placeholder="ej. Los Ángeles"></label>
+    <label>Fecha <input id="fecha" type="date"></label>
+    <label>Género <input id="genero" placeholder="ej. Ciencia ficción"></label>
+    <button id="buscar">Buscar</button>
+  </div>
+  <div id="msg" class="msg" hidden></div>
+  <div id="lista"></div>
+</main>
+<script src="/js/api.js"></script><script src="/js/nav.js"></script>
+<script src="/catalogo/cartelera.js"></script>
+</body></html>

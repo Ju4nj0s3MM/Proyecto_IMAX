@@ -1,0 +1,31 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Pago</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<main>
+  <h1>Resumen y pago (simulado)</h1>
+  <div class="card">
+    <div class="todo"><strong>TODO (Juanjo):</strong> mostrar el resumen de la reserva, tipo de entrada por asiento, desglose de tarifas,
+      promoción 2x1 y total (<code>POST /api/catalogo/total</code>).</div>
+    <p class="muted">Pago simulado: <strong>no se piden ni se guardan datos de tarjeta</strong> (RN-09).</p>
+    <div class="row">
+      <label>Método <select id="metodo"><option>TARJETA_SIMULADA</option><option>PAYPAL_SIMULADO</option><option>BILLETERA_SIMULADA</option></select></label>
+      <button id="aprobar">Simular pago APROBADO</button>
+      <button id="rechazar" class="danger">Simular pago RECHAZADO</button>
+    </div>
+  </div>
+  <div id="msg" class="msg" hidden></div>
+</main>
+<script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required"></script>
+<script>
+  const reserva = qs('reserva'), msg = document.getElementById('msg');
+  async function pagar(resultado) {
+    try {
+      await api('/venta/pagos', { method: 'POST', body: { reserva_id: +reserva, metodo: document.getElementById('metodo').value, resultado } });
+      if (resultado === 'APROBADO') location.href = '/venta/mis-entradas.html';
+      else mostrarMensaje(msg, 'Pago rechazado: los asientos fueron liberados.', 'err');
+    } catch (e) { mostrarMensaje(msg, e.message, 'err'); }
+  }
+  document.getElementById('aprobar').onclick = () => pagar('APROBADO');
+  document.getElementById('rechazar').onclick = () => pagar('RECHAZADO');
+</script>
+</body></html>

@@ -1,0 +1,25 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Selección de asientos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<main>
+  <h1>Selecciona tus asientos</h1>
+  <div class="card">
+    <div class="pantalla">PANTALLA</div>
+    <div id="mapa"></div>
+    <div class="leyenda">
+      <span><i style="background:var(--libre)"></i>Disponible</span>
+      <span><i style="background:var(--ocupado)"></i>Ocupado</span>
+      <span><i style="background:var(--bloqueado)"></i>Bloqueado</span>
+      <span><i style="background:var(--sel)"></i>Seleccionado</span>
+    </div>
+  </div>
+  <div class="card row">
+    <div>Seleccionados: <strong id="seleccion">ninguno</strong><br><span class="muted">Máximo <span id="max"></span> por compra (RN-04)</span></div>
+    <button id="bloquear" disabled>Reservar (bloquea 2 min)</button>
+    <div id="cuenta" hidden>Tiempo para pagar: <span class="timer" id="timer">02:00</span> <a class="btn" id="irPago" href="#">Ir a pagar</a></div>
+  </div>
+  <div id="msg" class="msg" hidden></div>
+</main>
+<script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required"></script>
+<script src="/venta/mapa.js"></script>
+</body></html>
