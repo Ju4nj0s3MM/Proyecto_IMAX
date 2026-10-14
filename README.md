@@ -1,7 +1,12 @@
 # Proyecto IMAX — Licitación para el Ecosistema Digital de Cines
 
+<<<<<<< HEAD
 Proyecto 2 del curso de Bases de Datos (II Sem 2026). Propuesta de una plataforma de venta de entradas
 de alta concurrencia: cartelera, asientos en tiempo real, pago simulado, QR, check-in y auditoría.
+=======
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
+![CI](https://img.shields.io/badge/DB%20CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
+>>>>>>> 2d881226cd4190057d3ac00366a3f0b466a02622
 
 **Stack:** PostgreSQL · (backend y frontend: definir) · Git
 
