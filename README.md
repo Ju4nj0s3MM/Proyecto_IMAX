@@ -236,7 +236,7 @@ En Windows, `build_schema.sh` se ejecuta desde Git Bash. Para conectar la aplica
 |---|---|---|---|---|
 | Matías Esquivel Lizano | 2025064711 | A · Catálogo y programación | `catalogo` | Catálogo, funciones, tarifas, factibilidad económica, requisitos, base de la aplicación |
 | Juan José Morales Montero | 2025085203 | B · Venta y boletos | `venta` | Bloqueo de asientos, pago, concurrencia, diseño integrado, pantallas de venta |
-| Brandon [Apellidos] | [carné] | C · Seguridad y acceso | `seguridad` | RBAC, check-in, auditoría, dictamen, riesgos, operación, documento final |
+| Brandon Rojas Garita | 2024089186 | C · Seguridad y acceso | `seguridad` | RBAC, check-in, auditoría, dictamen, riesgos, operación, documento final |
 
 ## 13. Documentación
 
