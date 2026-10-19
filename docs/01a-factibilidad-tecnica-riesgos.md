@@ -68,3 +68,16 @@ La propuesta guarda las compras en una hoja de Google Drive donde cada cliente e
 
 **Veredicto: no cumple.**
 
+### 3.4 Seguridad y pagos
+
+La propuesta reemplaza la pasarela de pago por un formulario web estático que envía los números completos de las tarjetas y los códigos CVV a un chat grupal de WhatsApp, donde un pasante los pasa manualmente por un datáfono.
+
+- **Incumple PCI DSS 4.0, requisito 3.3.1.** Los datos sensibles de autenticación, como el CVV, no pueden conservarse después de la autorización, ni siquiera cifrados. Un chat los conserva indefinidamente en los dispositivos de todos los participantes y en sus copias de respaldo.
+- **Incumple PCI DSS 4.0, requisito 4.2.2.** Se prohíbe enviar números de tarjeta sin protección por mensajería de usuario final (correo, SMS, chat). Referencia: <https://www.pcisecuritystandards.org/faqs/1085>.
+- **Sin pasarela certificada ni tokenización.** El número completo de la tarjeta circula y queda guardado en sistemas de la empresa, en lugar de ser reemplazado por un token.
+- **Alcance ampliado.** Todos los dispositivos de las personas que participan en el chat pasan a formar parte del entorno que PCI DSS obliga a proteger.
+- **Capacidad.** Un pasante que procese una tarjeta cada 30 segundos atiende 2 por minuto. Si solo 1 de cada 100 transacciones del pico fuera una compra, serían 300 000 compras: 300 000 × 30 s = 9 000 000 s, unos 104 días de trabajo continuo.
+- **Reglas de negocio.** Se viola RN-09 (pasarela certificada y prohibición de guardar el CVV) y RN-11 (no hay confirmación automática de la pasarela antes de emitir el comprobante).
+- **Exposición legal.** Una fuga de datos de tarjetas expone a la empresa a sanciones de las marcas y del adquirente, y a reclamos bajo las leyes de protección de datos de cada país, como la Ley 8968 en Costa Rica.
+
+**Veredicto: no cumple. Es una falla crítica.**
