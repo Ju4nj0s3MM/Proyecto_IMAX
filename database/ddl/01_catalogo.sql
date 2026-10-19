@@ -44,3 +44,14 @@ create table zona_asiento (
     nombre varchar(40) not null unique, 
     descripcion varchat(200)
 ); 
+
+create table asiento ( 
+    id bigint generated always as identity primary key,
+    sala_id bigint not null references sala(id) on delete restrict,
+    zona_asiento_id bigint not null references zona_asiento(id) on delete restrict,
+    fila varchat(5) not null, 
+    numero integer not null,
+    activo boolean not null default true,
+    constraint uq_asiento_sala_fila_numero unique (sala_id, fila, numero),
+    constraint ck_asiento_numero chack (numero > 0)
+); 
