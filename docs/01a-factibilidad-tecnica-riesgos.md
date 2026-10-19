@@ -40,3 +40,16 @@ La propuesta usa un único archivo de Microsoft Access o SQLite, guardado en un 
 - **Reglas de negocio.** Sin escritura concurrente confiable no se pueden garantizar el bloqueo temporal de asientos (RN-05) ni la prevención de doble venta.
 
 **Veredicto: no cumple.**
+
+### 3.2 Infraestructura y red
+
+Todo el tráfico global se enruta por una conexión residencial de fibra de 50 Mbps con Wi-Fi de 2,4 GHz y un extensor de señal.
+
+- **Ancho de banda por usuario.** 50 Mbps entre 8 000 000 de usuarios son 6,25 bits por segundo por persona, menos de lo que cuesta enviar un solo carácter.
+- **Ancho de banda por transacción.** Con una respuesta de apenas 2 KB, 50 000 solicitudes por segundo requieren unos 100 MB/s, es decir, cerca de 800 Mbps. El enlace cubriría la dieciseisava parte de esa demanda (800 / 50 = 16). El mapa de asientos de una sala pesa bastante más que 2 KB, así que la cifra real es mayor.
+- **Wi-Fi de 2,4 GHz con extensor.** Es un medio compartido y sujeto a interferencia. Un extensor de una sola radio reduce el rendimiento aproximadamente a la mitad en cada salto.
+- **Conexiones simultáneas.** Los routers domésticos suelen soportar del orden de miles de conexiones concurrentes, no millones.
+- **Sin protección.** No hay WAF, protección contra ataques de denegación de servicio ni balanceo de carga, y un servicio residencial no ofrece SLA.
+- **Alcance global.** Sin una red de distribución de contenido, los usuarios de otros continentes reciben todo desde Los Ángeles con latencias altas.
+
+**Veredicto: no cumple.**
