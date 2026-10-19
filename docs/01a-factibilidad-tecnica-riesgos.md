@@ -53,3 +53,18 @@ Todo el tráfico global se enruta por una conexión residencial de fibra de 50 M
 - **Alcance global.** Sin una red de distribución de contenido, los usuarios de otros continentes reciben todo desde Los Ángeles con latencias altas.
 
 **Veredicto: no cumple.**
+
+### 3.3 Reserva de asientos en una hoja de cálculo compartida
+
+La propuesta guarda las compras en una hoja de Google Drive donde cada cliente escribe su nombre a mano en el asiento deseado.
+
+- **Límites de la plataforma.** Una hoja de Google Sheets admite hasta 10 millones de celdas, y su API limita las solicitudes a cientos por cada 100 segundos. La carga pico exige 50 000 por segundo, es decir, 5 000 000 de solicitudes cada 100 segundos. Referencia: <https://developers.google.com/workspace/sheets/api/limits>.
+- **Sin atomicidad ni aislamiento.** Si dos personas escriben en la misma celda, gana la última escritura. La doble venta de asientos es inevitable.
+- **Sin bloqueo temporal.** No existe el bloqueo de 2 minutos con liberación automática (RN-05) ni un estado de asiento visible en tiempo real (RN-03).
+- **Sin integridad.** Cualquier persona con acceso puede modificar o borrar las reservas de otra. No hay validaciones, llaves ni restricciones.
+- **Sin vínculo con el pago.** La reserva no está asociada a una transacción, por lo que no hay compensación ante un pago fallido (RN-10).
+- **Sin comprobante único.** No se genera un código QR único por boleto (RN-12) ni se controla su uso en puerta (RN-14).
+- **Sin auditoría confiable.** El historial de versiones de una hoja no es una bitácora inalterable, y no cumple la retención de 5 años (RN-20).
+
+**Veredicto: no cumple.**
+
