@@ -38,3 +38,9 @@ create table sala (
     constraint ck_sala_capacidad check (capacidad > 0),
     constraint ck_sala_limpieza check (minutos_limpieza >= 0)
 ); 
+
+create table zona_asiento (
+    id bigint generated always as identity primary key,
+    nombre varchar(40) not null unique, 
+    descripcion varchat(200)
+); 
