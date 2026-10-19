@@ -81,3 +81,17 @@ La propuesta reemplaza la pasarela de pago por un formulario web estático que e
 - **Exposición legal.** Una fuga de datos de tarjetas expone a la empresa a sanciones de las marcas y del adquirente, y a reclamos bajo las leyes de protección de datos de cada país, como la Ley 8968 en Costa Rica.
 
 **Veredicto: no cumple. Es una falla crítica.**
+
+### 3.5 Recuperación ante desastres
+
+El plan de contingencia consiste en reiniciar el equipo y esperar que los clientes aguarden a que el sistema regrese.
+
+- **Sin copias de seguridad.** No existe respaldo de la base de datos. Si el disco falla, se pierden todas las ventas, reservas y registros de auditoría. El RPO (pérdida máxima de datos aceptable) es, en la práctica, todo el historial.
+- **Sin tiempo de recuperación definido.** El RTO depende de que el mismo equipo vuelva a encender. La licitación exige menos de 5 minutos.
+- **Disponibilidad.** Un SLA de 99,99 % permite 525 600 min × 0,0001 ≈ 52,6 minutos de inactividad al año. Un solo apagón de una hora consumiría más que el tiempo permitido en todo el año.
+- **Sin redundancia eléctrica ni de hardware.** Un equipo de 2012 bajo carga sostenida es propenso al sobrecalentamiento, y no hay fuente de poder ininterrumpida, segundo servidor ni conmutación automática.
+- **Riesgo de corrupción.** Un apagado abrupto durante una escritura puede dejar dañado el archivo de la base de datos, especialmente en Access, y no hay copia desde la cual restaurarlo.
+- **Impacto en el estreno.** Con millones de usuarios esperando, cada minuto sin servicio significa ventas perdidas y una experiencia negativa a escala global.
+- **Retención de 5 años.** Sin respaldos no se puede cumplir la persistencia obligatoria de los registros de auditoría (RN-20).
+
+**Veredicto: no cumple.**
