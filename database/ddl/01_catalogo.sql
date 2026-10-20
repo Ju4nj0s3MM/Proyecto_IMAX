@@ -68,3 +68,7 @@ create table clasificacion (
     constraint ck_clasificacion_edad check (edad_minima >= 0)
 ); 
 
+create table genero (
+    id bigint generated always as identity primary key, 
+    nombre varchar(50)not null unique
+); 
