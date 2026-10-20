@@ -95,3 +95,14 @@ El plan de contingencia consiste en reiniciar el equipo y esperar que los client
 - **Retención de 5 años.** Sin respaldos no se puede cumplir la persistencia obligatoria de los registros de auditoría (RN-20).
 
 **Veredicto: no cumple.**
+
+### 3.6 Dimensionamiento de la carga
+
+La propuesta heredada no incluye ningún cálculo de capacidad. Al aplicar la carga de referencia de la sección 2 se obtiene lo siguiente.
+
+- **Rendimiento de escritura.** Un único escritor serial que tarde 1 ms por transacción atiende como máximo 1 / 0,001 s = 1 000 TPS. El pico exige 50 000 TPS, 50 veces más, y 1 ms es un supuesto optimista para un equipo de 2012.
+- **Tiempo de atención.** Para dar una operación a cada uno de los 8 000 000 de usuarios a 50 000 TPS se necesitan 8 000 000 / 50 000 = 160 segundos, siempre que el sistema no se detenga.
+- **Volumen de boletos.** 15 000 000 al mes equivalen a 900 000 000 en cinco años, sin contar las bitácoras de transacciones, bloqueos de asientos, accesos en puerta y operaciones administrativas. El cálculo de almacenamiento completo se presenta en `01c-almacenamiento.md`.
+- **Carga de lectura.** Los 8 000 000 de usuarios consultan el mapa de asientos antes de comprar, por lo que las lecturas superan a las compras. La propuesta heredada no contempla réplicas de lectura ni caché.
+
+**Veredicto: no cumple.**
