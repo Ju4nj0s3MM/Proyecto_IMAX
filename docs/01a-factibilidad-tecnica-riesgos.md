@@ -145,4 +145,7 @@ La matriz evalúa los riesgos de la solución propuesta. La probabilidad se esti
 | R-02 | Doble venta de asientos por solicitudes simultáneas | Alta | Crítico | Restricción UNIQUE por función y asiento sobre reservas activas, transacciones ACID y prueba de concurrencia con 20 a 50 solicitudes idénticas | RTO 0 (preventivo) / RPO 0 |
 | R-03 | Caída o lentitud de la pasarela de pago | Media | Crítico | Segunda pasarela de respaldo, reintentos idempotentes, expiración del bloqueo a los 2 minutos y liberación inmediata de los asientos ante un rechazo (RN-10) | RTO < 2 min / RPO 0 |
 | R-04 | Ataque de denegación de servicio (DDoS) durante el estreno | Alta | Crítico | Red de distribución de contenido, WAF y limitación de tasa en el borde, fila virtual de entrada y autoescalado del cómputo | RTO < 5 min / RPO 0 |
-
+| R-05 | Pérdida de consistencia del inventario: bloqueos de asientos que no se liberan | Media | Crítico | Función de liberación de reservas vencidas, bitácora `asiento_auditoria_log` y conciliación periódica del inventario | RTO < 1 min / RPO 0 |
+| R-06 | Fuga de datos de tarjetas o incumplimiento de PCI DSS | Baja | Crítico | Sin número de tarjeta ni CVV en la base de datos (RN-09), pasarela certificada con tokenización, TLS 1.2 o superior y cifrado en reposo | No aplica (preventivo) |
+| R-07 | Caída total de una región de la nube | Baja | Crítico | Réplica en otra región con promoción a primaria y conmutación del tráfico por DNS | RTO < 5 min / RPO ≤ 5 s |
+| R-08 | Corrupción o borrado accidental de datos | Media | Crítico | Respaldo completo diario, archivado continuo del registro de transacciones (WAL) para recuperar a un punto en el tiempo y pruebas periódicas de restauración | RTO < 30 min / RPO ≤ 5 s |
