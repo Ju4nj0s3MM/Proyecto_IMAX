@@ -58,3 +58,39 @@ Cada escenario de falla se resuelve con un mecanismo distinto, y cada mecanismo 
 
 **Excepción para los datos dañados.** Si los datos se corrompen o se borran por error, la réplica copia el daño, por lo que la conmutación no sirve. Hay que restaurar desde un respaldo y reproducir el registro de transacciones hasta el instante anterior al incidente. Esto toma más tiempo y por eso el RTO y el RPO objetivo de esos escenarios son mayores, como se indica en los riesgos R-08 y R-09 de `01a-factibilidad-tecnica-riesgos.md`.
 
+## 5. Política de respaldos
+
+| Tipo de copia | Frecuencia | Retención | Destino |
+|---|---|---|---|
+| Respaldo completo de la base de datos | Diario | 35 días | Otra región |
+| Archivo continuo del registro de transacciones (WAL) | Cada 5 minutos como máximo | 35 días | Otra región |
+| Copia mensual de bitácoras de auditoría | Mensual | 5 años | Almacenamiento de archivo inmutable |
+| Prueba de restauración | Mensual | No aplica | Entorno aislado |
+
+**Frecuencia.** El respaldo completo diario fija el punto de partida de cualquier restauración. El archivo continuo del registro de transacciones permite avanzar desde ese respaldo hasta cualquier instante de los últimos 35 días. Para que ese archivo no dependa de que se llene un segmento, se configura `archive_timeout` en 300 segundos, de modo que nunca pasen más de 5 minutos sin una copia. De ahí sale el RPO de 5 minutos para los escenarios de datos dañados.
+
+**Regla 3-2-1 adaptada a la nube.** Se mantienen tres copias de los datos (la primaria, la réplica y el respaldo), en al menos dos tipos de almacenamiento (disco de base de datos y almacenamiento de objetos), y una copia en una región distinta a la primaria.
+
+**Cifrado.** Los respaldos se cifran en reposo y las claves se administran con un servicio de gestión de claves, separado del acceso a los datos.
+
+## 6. Retención de la auditoría
+
+La regla RN-20 exige conservar durante al menos 5 años los registros de auditoría. Las cuatro bitácoras se guardan en tablas separadas y particionadas por mes:
+
+- `transaccion_log`: intentos de pago, confirmaciones y emisión de boletos.
+- `asiento_auditoria_log`: bloqueos, liberaciones y compras de asientos.
+- `acceso_puerta_log`: lecturas de códigos QR en puerta.
+- `admin_operacion_audit`: operaciones manuales de administradores.
+
+| Antigüedad | Dónde se guardan | Cómo se consultan |
+|---|---|---|
+| Meses 1 a 12 | Particiones activas en la base de datos | Directamente con SQL |
+| Meses 13 a 60 | Particiones desvinculadas y exportadas a almacenamiento de archivo inmutable | Se restauran bajo demanda |
+| Después de 60 meses | Elegibles para eliminación según la política de la empresa | No aplica |
+
+**Por qué particionar.** Las particiones mensuales mantienen pequeñas las tablas de uso diario, de modo que las consultas recientes no recorren años de historia. Mover una partición antigua es una operación de metadatos, no un borrado masivo de filas, y no bloquea las ventas.
+
+**Inalterabilidad.** El almacenamiento de archivo se configura con una política de inmutabilidad: durante el periodo de retención nadie, ni siquiera un administrador, puede modificar o borrar los objetos. Dentro de la base de datos, los roles de la aplicación no tienen permisos de `UPDATE` ni de `DELETE` sobre estas tablas.
+
+El volumen de datos y el costo de este almacenamiento se calculan en `01c-almacenamiento.md`.
+
