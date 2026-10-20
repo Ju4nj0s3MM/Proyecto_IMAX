@@ -106,3 +106,14 @@ La propuesta heredada no incluye ningún cálculo de capacidad. Al aplicar la ca
 - **Carga de lectura.** Los 8 000 000 de usuarios consultan el mapa de asientos antes de comprar, por lo que las lecturas superan a las compras. La propuesta heredada no contempla réplicas de lectura ni caché.
 
 **Veredicto: no cumple.**
+
+## 4. Resumen del análisis
+
+| Componente | Requisito de la licitación | Propuesta heredada | Resultado |
+|---|---|---|---|
+| Base de datos | 50 000 TPS, escrituras concurrentes y 900 000 000 de boletos | Un escritor, límite de 2 GB en Access | No cumple |
+| Red | Cerca de 800 Mbps para 50 000 solicitudes de 2 KB | 50 Mbps residenciales | No cumple |
+| Reservas | Bloqueo atómico de 2 minutos, sin doble venta | Hoja de cálculo compartida | No cumple |
+| Pagos | Pasarela certificada, sin guardar CVV (RN-09) | Chat de WhatsApp y datáfono manual | No cumple (crítico) |
+| Recuperación | RTO < 5 min, RPO ≤ 5 s, SLA 99,99 % | Reiniciar el equipo | No cumple |
+| Dimensionamiento | Cálculo de carga y de 5 años de datos | Sin cálculo; máximo cercano a 1 000 TPS | No cumple |
