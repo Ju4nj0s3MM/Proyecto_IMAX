@@ -85,3 +85,9 @@ create table pelicula (
     creado_en timestamptz not null default now(),
     constraint ck_pelicula_duracion check (duracion_min > 0)
 ); 
+
+create table pelicula_genero (
+    pelicula_id bigint not null references pelicula(id) on delete cascade,
+    genero_id bigint not null references genero(id) on delete restrict,
+    primary key (pelicula_id, genero_id)
+);
