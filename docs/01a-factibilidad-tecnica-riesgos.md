@@ -134,3 +134,15 @@ La solución que se propone en su lugar se apoya en estos principios:
 - Objetivos de recuperación de RPO ≤ 5 segundos, RTO inferior a 5 minutos y SLA de 99,99 %.
 
 El análisis económico se presenta en `01b-factibilidad-economica.md`, los requisitos en `02-requisitos.md`, el diseño en `03-diseno/` y la estrategia de operación en `05-operacion.md`. A continuación se presenta la matriz de riesgos de la solución propuesta.
+
+## 6. Matriz de riesgos y mitigación
+
+La matriz evalúa los riesgos de la solución propuesta. La probabilidad se estima antes de aplicar la mitigación, el impacto describe el efecto sobre la operación si el riesgo ocurre, y el RTO y el RPO son los objetivos que debe cumplir el plan de respaldo.
+
+| ID Riesgo | Descripción del Riesgo | Probabilidad (Baja/Media/Alta) | Impacto (Bajo/Medio/Crítico) | Estrategia de Mitigación / Plan de Respaldo (DRP) | RTO / RPO Objetivo |
+|---|---|---|---|---|---|
+| R-01 | Caída de la instancia principal de base de datos durante el estreno | Media | Crítico | Alta disponibilidad con réplica síncrona en otra zona y conmutación automática (failover) | RTO < 5 min / RPO ≈ 0 |
+| R-02 | Doble venta de asientos por solicitudes simultáneas | Alta | Crítico | Restricción UNIQUE por función y asiento sobre reservas activas, transacciones ACID y prueba de concurrencia con 20 a 50 solicitudes idénticas | RTO 0 (preventivo) / RPO 0 |
+| R-03 | Caída o lentitud de la pasarela de pago | Media | Crítico | Segunda pasarela de respaldo, reintentos idempotentes, expiración del bloqueo a los 2 minutos y liberación inmediata de los asientos ante un rechazo (RN-10) | RTO < 2 min / RPO 0 |
+| R-04 | Ataque de denegación de servicio (DDoS) durante el estreno | Alta | Crítico | Red de distribución de contenido, WAF y limitación de tasa en el borde, fila virtual de entrada y autoescalado del cómputo | RTO < 5 min / RPO 0 |
+
