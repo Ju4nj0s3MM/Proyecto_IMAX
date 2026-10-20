@@ -72,3 +72,16 @@ create table genero (
     id bigint generated always as identity primary key, 
     nombre varchar(50)not null unique
 ); 
+
+create table pelicula (
+    id bigint generated always as identity primary key, 
+    titulo varchar(200) not null, 
+    sinopsis text not null,
+    duracion_min integer not null,
+    porter_url varchar(250),
+    clasificacion_id bigint not null references clasificacion(id) on delete restrict, 
+    fecha_estreno date,
+    activa boolean not null default true,
+    creado_en timestamptz not null default now(),
+    constraint ck_pelicula_duracion check (duracion_min > 0)
+); 
