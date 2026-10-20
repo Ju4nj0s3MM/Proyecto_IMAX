@@ -4,7 +4,7 @@
 -- Fecha de creación domingo 18 de octubre del 2026 / Hora: 22:22
 --                  =============================================================
 
-create extension if not eexists btree_gist; 
+create extension if not exists btree_gist; 
 
 
 -- --------------
@@ -16,7 +16,7 @@ create table cine (
     nombre varchar(100) not null,
     direccion varchar(250) not null,
     ciudad varchar(100) not null,
-    pais varchat(50) not null default 'Costa Rica',
+    pais varchar(50) not null default 'Costa Rica',
     latitud numeric(9,6),
     longitud numeric(9,6), 
     activo boolean not null default true,
@@ -29,7 +29,7 @@ create table cine (
 create table sala (
     id bigint generated always as identity primary key, 
     cine_id bigint not null references cine(id) on delete restrict,
-    nombre varchat(60) not null,
+    nombre varchar(60) not null,
     capacidad integer not null,
     minutos_limpieza integer not null default 20, 
     activa boolean not null default true,
@@ -42,16 +42,29 @@ create table sala (
 create table zona_asiento (
     id bigint generated always as identity primary key,
     nombre varchar(40) not null unique, 
-    descripcion varchat(200)
+    descripcion varchar(200)
 ); 
 
 create table asiento ( 
     id bigint generated always as identity primary key,
     sala_id bigint not null references sala(id) on delete restrict,
     zona_asiento_id bigint not null references zona_asiento(id) on delete restrict,
-    fila varchat(5) not null, 
+    fila varchar(5) not null, 
     numero integer not null,
     activo boolean not null default true,
     constraint uq_asiento_sala_fila_numero unique (sala_id, fila, numero),
-    constraint ck_asiento_numero chack (numero > 0)
+    constraint ck_asiento_numero check (numero > 0)
 ); 
+
+-- ----------------------
+-- Películas, clasificacion y géneros
+-- ----------------------
+
+create table clasificacion (
+    id bigint generated always as identity primary key, 
+    codigo varchar(10) not null unique, 
+    descripcion varchar(200) not null,
+    edad_minima integer not null default 0,
+    constraint ck_clasificacion_edad check (edad_minima >= 0)
+); 
+
