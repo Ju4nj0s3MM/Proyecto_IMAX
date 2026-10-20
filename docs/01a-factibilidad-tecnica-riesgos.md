@@ -148,8 +148,8 @@ La matriz evalúa los riesgos de la solución propuesta. La probabilidad se esti
 | R-05 | Pérdida de consistencia del inventario: bloqueos de asientos que no se liberan | Media | Crítico | Función de liberación de reservas vencidas, bitácora `asiento_auditoria_log` y conciliación periódica del inventario | RTO < 1 min / RPO 0 |
 | R-06 | Fuga de datos de tarjetas o incumplimiento de PCI DSS | Baja | Crítico | Sin número de tarjeta ni CVV en la base de datos (RN-09), pasarela certificada con tokenización, TLS 1.2 o superior y cifrado en reposo | No aplica (preventivo) |
 | R-07 | Caída total de una región de la nube | Baja | Crítico | Réplica en otra región con promoción a primaria y conmutación del tráfico por DNS | RTO < 5 min / RPO ≤ 5 s |
-| R-08 | Corrupción o borrado accidental de datos | Media | Crítico | Respaldo completo diario, archivado continuo del registro de transacciones (WAL) para recuperar a un punto en el tiempo y pruebas periódicas de restauración | RTO < 30 min / RPO ≤ 5 s |
-| R-09 | Alteración o borrado de las bitácoras de auditoría | Baja | Crítico | Tablas particionadas por fecha sin permisos de UPDATE ni DELETE para los roles de la aplicación, y copias en almacenamiento inmutable | RTO < 1 h / RPO ≤ 5 s |
+| R-08 | Corrupción o borrado accidental de datos | Media | Crítico | Respaldo completo diario, archivado continuo del registro de transacciones (WAL) para recuperar a un punto en el tiempo y pruebas periódicas de restauración | RTO < 30 min / RPO ≤ 5 min |
+| R-09 | Alteración o borrado de las bitácoras de auditoría | Baja | Crítico | Tablas particionadas por fecha sin permisos de UPDATE ni DELETE para los roles de la aplicación, y copias en almacenamiento inmutable | RTO < 1 h / RPO ≤ 5 min |
 | R-10 | Uso indebido de privilegios en el panel de administración | Media | Crítico | Control de acceso por roles con privilegio mínimo (RN-17), registro en `admin_operacion_audit` con usuario, rol e IP (RN-20) y revisión periódica de roles | RTO < 1 h / RPO 0 |
 | R-11 | Reutilización o falsificación de códigos QR en la puerta | Media | Medio | Código único por boleto, validación atómica del estado del boleto en una sola operación (RN-14) y registro de cada lectura en `acceso_puerta_log` | RTO 0 / RPO 0 |
 
@@ -158,3 +158,4 @@ Notas sobre la matriz:
 - Los objetivos generales de la plataforma son RPO ≤ 5 segundos, RTO inferior a 5 minutos y SLA de 99,99 %. El riesgo R-08 tiene un RTO mayor porque restaurar un respaldo y reproducir el registro de transacciones requiere más tiempo que una conmutación automática.
 - En los riesgos preventivos (R-02, R-06 y R-11) la mitigación evita que el incidente ocurra, por lo que el tiempo de recuperación es cero o no aplica.
 - Las políticas de respaldo, la frecuencia y la justificación de los valores de RTO y RPO se detallan en `05-operacion.md`.
+- En R-08 y R-09 el RPO es de hasta 5 minutos, porque la recuperación a un punto en el tiempo depende de la frecuencia con la que el servicio administrado archiva el registro de transacciones. El RPO de 5 segundos o menos se cumple en las fallas de infraestructura (R-01 y R-07) mediante replicación.
