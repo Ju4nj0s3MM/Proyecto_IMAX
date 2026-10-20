@@ -40,3 +40,21 @@ El SLA de extremo a extremo depende de cada componente en serie, así que no bas
 **Falla de una zona.** La réplica síncrona vive en otra zona de la misma región. Si la primaria falla, el servicio administrado promueve la réplica de forma automática. Como cada transacción se confirma en ambas copias, no se pierden datos (RPO cercano a 0), y la conmutación toma del orden de uno a dos minutos según el proveedor.
 
 **Falla de una región.** La réplica asíncrona en otra región se promueve a primaria y el tráfico se redirige por DNS. El retraso de replicación se monitorea y genera una alerta si supera los 5 segundos, de modo que el RPO se mantenga en ese límite.
+
+## 4. Justificación de RPO y RTO
+
+Cada escenario de falla se resuelve con un mecanismo distinto, y cada mecanismo alcanza valores distintos.
+
+| Escenario | Mecanismo | RPO logrado | RTO logrado |
+|---|---|---|---|
+| Falla de instancia o de zona | Réplica síncrona y conmutación automática | 0 | 1 a 2 min |
+| Falla de región | Réplica asíncrona y cambio de DNS (TTL de 60 s) | ≤ 5 s | < 5 min |
+| Corrupción o borrado lógico de datos | Restauración a un punto en el tiempo | ≤ 5 min | < 30 min |
+| Alteración de bitácoras o ransomware | Copias inmutables en otra región | ≤ 5 min | < 1 h |
+
+**Por qué se cumple el RPO de 5 segundos o menos.** En una falla de zona la réplica es síncrona: una transacción no se confirma hasta que está en ambas copias, así que no se pierde ninguna. En una falla de región la réplica es asíncrona, por lo que puede existir un pequeño retraso. Ese retraso se mide de forma continua y se emite una alerta cuando supera los 5 segundos, antes de que el riesgo se materialice.
+
+**Por qué se cumple el RTO menor a 5 minutos.** La conmutación entre zonas es automática y no requiere intervención humana, y los servicios administrados la completan en uno o dos minutos. Para una falla de región se suman la promoción de la réplica y la propagación del DNS, que con un TTL de 60 segundos mantienen el total por debajo de los 5 minutos.
+
+**Excepción para los datos dañados.** Si los datos se corrompen o se borran por error, la réplica copia el daño, por lo que la conmutación no sirve. Hay que restaurar desde un respaldo y reproducir el registro de transacciones hasta el instante anterior al incidente. Esto toma más tiempo y por eso el RTO y el RPO objetivo de esos escenarios son mayores, como se indica en los riesgos R-08 y R-09 de `01a-factibilidad-tecnica-riesgos.md`.
+
