@@ -117,3 +117,20 @@ La propuesta heredada no incluye ningún cálculo de capacidad. Al aplicar la ca
 | Pagos | Pasarela certificada, sin guardar CVV (RN-09) | Chat de WhatsApp y datáfono manual | No cumple (crítico) |
 | Recuperación | RTO < 5 min, RPO ≤ 5 s, SLA 99,99 % | Reiniciar el equipo | No cumple |
 | Dimensionamiento | Cálculo de carga y de 5 años de datos | Sin cálculo; máximo cercano a 1 000 TPS | No cumple |
+
+## 5. Dictamen
+
+Se rechaza la propuesta técnica del proveedor saliente. Ninguno de los seis componentes evaluados cumple los requisitos de la licitación, y las fallas se presentan en todas las capas: datos, red, control de inventario, pagos y recuperación.
+
+Dos de ellas son críticas por sí solas. La reserva de asientos en una hoja de cálculo hace inevitable la doble venta, y el envío de números de tarjeta y CVV por chat incumple PCI DSS y expone a la empresa a sanciones y a una fuga de datos. Aunque se corrigieran las demás, cualquiera de estas dos bastaría para descartar la propuesta.
+
+La solución que se propone en su lugar se apoya en estos principios:
+
+- Una base de datos relacional PostgreSQL administrada en la nube, con alta disponibilidad y réplica en otra zona.
+- Integridad transaccional ACID y una restricción de unicidad que impide vender dos veces el mismo asiento.
+- Pasarela de pago externa certificada, sin almacenar datos de tarjeta en la base de datos propia.
+- Balanceo de carga, WAF y red de distribución de contenido para absorber el tráfico del estreno.
+- Particionamiento por fecha de las bitácoras de auditoría y respaldos con retención de 5 años.
+- Objetivos de recuperación de RPO ≤ 5 segundos, RTO inferior a 5 minutos y SLA de 99,99 %.
+
+El análisis económico se presenta en `01b-factibilidad-economica.md`, los requisitos en `02-requisitos.md`, el diseño en `03-diseno/` y la estrategia de operación en `05-operacion.md`. A continuación se presenta la matriz de riesgos de la solución propuesta.
