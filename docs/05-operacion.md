@@ -137,3 +137,21 @@ Un respaldo que nunca se ha restaurado no garantiza nada, por lo que los procedi
 | Prueba de carga y conmutación antes de un estreno mundial | Antes de cada estreno | Sostiene 50 000 TPS y cumple los tiempos de recuperación |
 
 Cada prueba deja un registro con la fecha, el tiempo medido y los problemas encontrados. Si algún resultado supera los objetivos de RTO o RPO, se corrige el procedimiento y se repite la prueba.
+
+## 9. Privacidad y cumplimiento
+
+**Datos que se almacenan.** Nombre, correo, contraseña (solo como hash bcrypt) e historial de compras y entradas. No se guarda ningún número de tarjeta ni CVV (RN-09); los pagos se delegan a una pasarela certificada.
+
+**Medidas de protección.**
+
+- Cifrado en tránsito con TLS 1.2 o superior y cifrado en reposo en la base de datos y en los respaldos.
+- Acceso por roles con privilegio mínimo (RN-17).
+- Las contraseñas nunca aparecen en los registros ni en las bitácoras.
+- Los correos se enmascaran en las bitácoras y en los reportes cuando no es necesario verlos completos.
+
+**Derechos de las personas.** Normativas como el GDPR y la Ley 8968 de Costa Rica reconocen derechos de acceso, rectificación y supresión de datos personales. Al recibir una solicitud de supresión se eliminan o anonimizan los datos que no sean necesarios.
+
+**Conflicto con la retención de 5 años.** Los registros de transacciones y de auditoría se conservan por obligación fiscal y de seguridad. Para conciliar ambas exigencias, en esos registros se reemplazan el nombre y el correo por un identificador anónimo cuando la persona solicita su supresión, y se conserva el resto de la información financiera necesaria para la auditoría.
+
+**Incidentes.** Ante una fuga de datos se activa el procedimiento de respuesta, se aíslan los sistemas afectados, se notifica a las autoridades y a las personas dentro de los plazos que establezca la normativa aplicable, y se documenta el incidente.
+
