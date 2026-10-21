@@ -25,3 +25,22 @@ Cada rol recibe únicamente los permisos que necesita para cumplir su función (
 | Configuración de salas y funciones | Sin acceso | Sin acceso | Sin acceso | Sin acceso | Lectura y escritura (restringido por RN-18) |
 | Auditoría y gestión de roles | Sin acceso | Sin acceso | Sin acceso | Sin acceso | Lectura total de la bitácora y de los roles |
 
+## 4. Aplicación en el sistema
+
+El control de acceso se aplica en dos capas, para que una falla en una no abra la puerta a la otra.
+
+**Base de datos.** Cada rol de aplicación tiene un rol de PostgreSQL sin inicio de sesión (`rol_cliente`, `rol_taquillero`, `rol_operador_sala`, `rol_contador` y `rol_administrador`). Los permisos se otorgan con `GRANT` solo sobre las tablas y funciones que cada rol necesita, y todo lo demás queda sin permiso. Los roles de la aplicación no tienen `UPDATE` ni `DELETE` sobre las tablas de auditoría.
+
+**Aplicación.** El servidor valida la sesión y el rol del usuario antes de ejecutar cada operación y rechaza con un error 403 las solicitudes de un rol sin permiso. Los menús de la interfaz solo muestran las opciones del rol, pero la restricción real está en el servidor y en la base de datos.
+
+**Asignación de roles.** Los roles se guardan en `rol` y se asignan en `usuario_rol`. Un usuario puede tener más de un rol, por ejemplo taquillero y contador, y en ese caso recibe la suma de los permisos de ambos. La asignación y la revocación de roles son operaciones críticas que solo puede hacer un administrador y quedan registradas en `admin_operacion_audit`.
+
+**Reglas relacionadas.**
+
+| Regla | Efecto sobre el control de acceso |
+|---|---|
+| RN-17 | Segmenta el panel de administración por perfil |
+| RN-18 | Impide modificar o eliminar una sala con entradas vendidas, incluso a un administrador |
+| RN-19 | Limita los reembolsos a la política vigente, salvo un reembolso forzado que queda auditado |
+| RN-20 | Registra fecha, hora, dirección IP, rol y usuario de cada operación manual |
+
