@@ -124,3 +124,16 @@ El volumen de datos y el costo de este almacenamiento se calculan en `01c-almace
 2. Se restauran las bitácoras desde las copias inmutables de otra región.
 3. Se compara el contenido restaurado con la base viva para detectar las filas alteradas.
 
+## 8. Pruebas de recuperación
+
+Un respaldo que nunca se ha restaurado no garantiza nada, por lo que los procedimientos se ensayan de forma periódica.
+
+| Prueba | Frecuencia | Criterio de aceptación |
+|---|---|---|
+| Restauración de un respaldo en un entorno aislado | Mensual | Restauración completa y conteos de filas iguales a los de producción |
+| Restauración a un punto en el tiempo | Trimestral | Datos correctos hasta el instante pedido, en menos de 30 minutos |
+| Conmutación entre zonas | Trimestral | Servicio restablecido en menos de 5 minutos, sin pérdida de datos |
+| Simulacro de falla de región | Semestral | Servicio restablecido en menos de 5 minutos con un retraso de replicación de 5 segundos o menos |
+| Prueba de carga y conmutación antes de un estreno mundial | Antes de cada estreno | Sostiene 50 000 TPS y cumple los tiempos de recuperación |
+
+Cada prueba deja un registro con la fecha, el tiempo medido y los problemas encontrados. Si algún resultado supera los objetivos de RTO o RPO, se corrige el procedimiento y se repite la prueba.
