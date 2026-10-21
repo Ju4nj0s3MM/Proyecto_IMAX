@@ -94,3 +94,33 @@ La regla RN-20 exige conservar durante al menos 5 años los registros de auditor
 
 El volumen de datos y el costo de este almacenamiento se calculan en `01c-almacenamiento.md`.
 
+## 7. Procedimientos de recuperación
+
+**Falla de zona o de instancia.** Es automática.
+
+1. El servicio administrado detecta la falla y promueve la réplica síncrona.
+2. La aplicación se reconecta mediante el punto de conexión del clúster, sin cambios de configuración.
+3. El equipo de operaciones verifica la nueva primaria y crea una nueva réplica en la zona recuperada.
+
+**Falla de región.**
+
+1. Las alertas de disponibilidad declaran el incidente.
+2. Se promueve la réplica de otra región a primaria.
+3. Se cambia el DNS hacia la región activa (TTL de 60 segundos).
+4. Se mide el retraso de replicación al momento de la falla para conocer cuántos segundos de datos se pudieron perder.
+5. Se reconstruye una nueva réplica en la región afectada cuando esta se recupere.
+
+**Datos corruptos o borrados por error.**
+
+1. Se pone la aplicación en modo de mantenimiento para detener las escrituras.
+2. Se identifica el instante anterior al incidente consultando las bitácoras de auditoría.
+3. Se restaura el último respaldo completo y se reproduce el registro de transacciones hasta ese instante, en una instancia nueva.
+4. Se validan los conteos y las sumas de control contra los datos esperados.
+5. Se conmuta el tráfico a la instancia restaurada o se reconcilian solo las filas afectadas.
+
+**Alteración de bitácoras o ransomware.**
+
+1. Se aíslan las cuentas comprometidas y se rotan las credenciales.
+2. Se restauran las bitácoras desde las copias inmutables de otra región.
+3. Se compara el contenido restaurado con la base viva para detectar las filas alteradas.
+
