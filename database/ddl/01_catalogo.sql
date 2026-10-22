@@ -91,3 +91,24 @@ create table pelicula_genero (
     genero_id bigint not null references genero(id) on delete restrict,
     primary key (pelicula_id, genero_id)
 );
+
+-- ----------------------
+-- Funciones (con no translape por sala)
+-- ---------------------
+create table funcion (
+    id bigint generated always as identity primary key,
+    pelicula_id bigint not null references pelicula(id) on delete restrict,
+    sala_id bigint not null references sala(id) on delete restrict,
+    inicio timestamptz not null,
+    fin timestamptz not null,
+    fin_limpieza timestamptz not null,
+    estado varchar(20) not null default 'Activa',
+    creado_en timestamptz not null default now(),
+    constraint ck_funcion_estado check (estado in ('Activa', 'Cancelada', 'Finalizada')),
+    constraint ck_funcion_fin check (fin >= inicio),
+    constraint ck_funcion_fin_limpieza check (fin_limpieza >= fin), 
+    constraint ex_funcion_sin_traslape 
+        exclude using gist (sala_id with =, tstzrange(inicio, fin_limpieza) with &&)
+        where (estado <> 'Cancelada')
+);
+
