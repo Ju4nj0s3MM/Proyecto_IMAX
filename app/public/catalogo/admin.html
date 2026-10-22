@@ -1,13 +1,91 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Admin catálogo</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/css/styles.css"><link rel="stylesheet" href="/catalogo/admin.css"></head>
 <body>
-<main>
+<main class="ancho">
   <h1>Administración de catálogo</h1>
-  <div class="todo">
-    <strong>TODO (Mati):</strong> alta de película (sinopsis, clasificación, duración, póster), configuración de salas y mapa de asientos
-    (mostrar el error de RN-18 si hay ventas), programación de funciones (mostrar el error de traslape) y matriz de precios/promociones.
-    Endpoints en <code>src/routes/catalogo.js</code> (/api/catalogo/admin/...).
+  <p class="muted">Cartelera, programación de funciones, salas y su mapa de asientos, tarifas y promociones
+     (tablas de <code>database/ddl/01_catalogo.sql</code>). Solo rol <strong>administrador</strong> (RN-17).</p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="peliculas">Películas</button>
+    <button role="tab" data-tab="funciones">Funciones</button>
+    <span class="sep"></span>
+    <button role="tab" data-tab="cines">Cines</button>
+    <button role="tab" data-tab="salas">Salas</button>
+    <button role="tab" data-tab="asientos">Mapa de asientos</button>
+    <button role="tab" data-tab="zonas">Zonas</button>
+    <span class="sep"></span>
+    <button role="tab" data-tab="tipos">Tipos de entrada</button>
+    <button role="tab" data-tab="tarifas">Tarifas</button>
+    <button role="tab" data-tab="promociones">Promociones</button>
+    <span class="sep"></span>
+    <button role="tab" data-tab="clasificaciones">Clasificaciones</button>
+    <button role="tab" data-tab="generos">Géneros</button>
   </div>
+
+  <div id="msg" class="msg" hidden></div>
+
+  <!-- CRUD genérico: el formulario y la tabla se construyen desde SECCIONES en admin.js -->
+  <section id="crud" hidden>
+    <div class="card">
+      <h2 id="form-titulo"></h2>
+      <form id="form" class="grid-form" autocomplete="off"></form>
+      <div class="acciones">
+        <button type="submit" form="form" id="guardar">Guardar</button>
+        <button type="button" class="secondary" id="cancelar" hidden>Cancelar edición</button>
+      </div>
+    </div>
+    <!-- Panel propio de algunas pestañas: agenda de funciones, matriz de precios -->
+    <div id="panel-extra" hidden></div>
+    <div class="card">
+      <div class="row entre">
+        <h2 id="tabla-titulo" style="margin:0"></h2>
+        <label class="buscar">Buscar <input id="filtro" type="search" placeholder="Filtrar filas…"></label>
+      </div>
+      <div class="scroll"><table id="tabla"></table></div>
+    </div>
+  </section>
+
+  <!-- Editor del mapa de asientos de una sala -->
+  <section id="asientos" hidden>
+    <div class="card row">
+      <label>Sala <select id="as-sala"></select></label>
+      <div id="as-resumen" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <h2>Generar cuadrícula</h2>
+      <p class="muted">Crea las filas (A, B, C…) con N asientos cada una. Luego puedes desactivar asientos (pasillos) o cambiar zonas en el mapa.</p>
+      <div class="row">
+        <label>Filas <input id="gen-filas" type="number" min="1" max="26" value="8"></label>
+        <label>Asientos por fila <input id="gen-cols" type="number" min="1" max="60" value="10"></label>
+        <label>Zona por defecto <select id="gen-zona"></select></label>
+        <label class="check"><input id="gen-reemplazar" type="checkbox"> Reemplazar asientos existentes</label>
+        <button id="gen-btn">Generar</button>
+      </div>
+      <details>
+        <summary>Zona por fila</summary>
+        <div id="gen-zonas-fila" class="zonas-fila"></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <div class="row entre">
+        <h2 style="margin:0">Mapa</h2>
+        <div class="row herramienta">
+          <label class="check"><input type="radio" name="herr" value="activo" checked> Activar / desactivar</label>
+          <label class="check"><input type="radio" name="herr" value="zona"> Asignar zona</label>
+          <select id="herr-zona"></select>
+        </div>
+      </div>
+      <p class="muted">Clic en un asiento para aplicar la herramienta; clic en la letra de la fila para aplicarla a toda la fila.</p>
+      <div class="pantalla">PANTALLA</div>
+      <div id="mapa" class="mapa-admin"></div>
+      <div id="leyenda" class="leyenda"></div>
+    </div>
+  </section>
 </main>
 <script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required" data-roles="administrador"></script>
+<script src="/catalogo/admin.js"></script>
 </body></html>

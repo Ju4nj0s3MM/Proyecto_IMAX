@@ -78,7 +78,7 @@ create table pelicula (
     titulo varchar(200) not null, 
     sinopsis text not null,
     duracion_min integer not null,
-    porter_url varchar(250),
+    poster_url varchar(250),
     clasificacion_id bigint not null references clasificacion(id) on delete restrict, 
     fecha_estreno date,
     activa boolean not null default true,
@@ -91,3 +91,95 @@ create table pelicula_genero (
     genero_id bigint not null references genero(id) on delete restrict,
     primary key (pelicula_id, genero_id)
 );
+
+-- ----------------------
+-- Funciones (con no translape por sala)
+-- ---------------------
+create table funcion (
+    id bigint generated always as identity primary key,
+    pelicula_id bigint not null references pelicula(id) on delete restrict,
+    sala_id bigint not null references sala(id) on delete restrict,
+    inicio timestamptz not null,
+    fin timestamptz not null,
+    fin_limpieza timestamptz not null,
+    estado varchar(20) not null default 'Activa',
+    creado_en timestamptz not null default now(),
+    constraint ck_funcion_estado check (estado in ('Activa', 'Cancelada', 'Finalizada')),
+    constraint ck_funcion_fin check (fin >= inicio),
+    constraint ck_funcion_fin_limpieza check (fin_limpieza >= fin), 
+    constraint ex_funcion_sin_traslape 
+        exclude using gist (sala_id with =, tstzrange(inicio, fin_limpieza) with &&)
+        where (estado <> 'Cancelada')
+);
+
+
+-- ocupamos antes de seguir con otras funciones un trigger para que funcione la tabla anterior
+
+create function trg_funcion_calcular_fin() returns trigger 
+language plpgsql as $$
+declare
+    v_duracion integer;
+    v_limpieza integer;
+begin 
+    select duracion_min into v_duracion from pelicula where id = new.pelicula_id;
+    select minutos_limpieza into v_limpieza from sala where id = new.sala_id;
+    if v_duracion is null or v_limpieza is null then 
+        raise exception 'Película % o sala % inexistente',
+            new.pelicula_id, new.sala_id;
+    end if;
+    new.fin := new.inicio + make_interval(mins => v_duracion);
+    new.fin_limpieza := new.fin + make_interval(mins => v_limpieza);
+    return new;
+end $$; 
+
+create trigger trg_funcion_calcular_fin
+    before insert or update of pelicula_id, sala_id, inicio on funcion
+    for each row execute function trg_funcion_calcular_fin();
+
+-- ----------------------
+-- tipos de entradas promociones tarifas entre otros precios
+-- ----------------------
+
+create table tipo_entrada(
+    id bigint generated always as identity primary key,
+    nombre varchar(50) not null unique,
+    descripcion varchar(200),
+    requiere_documento boolean not null default false
+);
+
+create table tarifa (
+    id bigint generated always as identity primary key,
+    tipo_entrada_id bigint not null references tipo_entrada(id) on delete restrict,
+    zona_asiento_id bigint not null references zona_asiento(id) on delete restrict,
+    dia_semana smallint, 
+    hora_desde time not null default '00:00:00',
+    hora_hasta time not null default '23:59:59',
+    precio numeric(12,2) not null,
+    cargo_servicio numeric(12,2) not null default 0,
+    activa boolean not null default true,
+    constraint ck_tarifa_dia check (dia_semana is null or dia_semana between 1 and 7),
+    constraint ck_tarifa_horas check (hora_hasta > hora_desde),
+    constraint ck_tarifa_precio check (precio >= 0),
+    constraint ck_tarifa_cargo check (cargo_servicio >= 0)
+);
+
+create unique index uq_tarifa_combinacion  
+    on tarifa (tipo_entrada_id, zona_asiento_id, coalesce(dia_semana, 0), hora_desde); 
+
+create table promocion (
+    id bigint generated always as identity primary key,
+    nombre varchar(100) not null, 
+    tipo varchar(10) not null default '2X1',
+    dia_semana smallint,
+    requiere_cantidad_par boolean not null default true,
+    tipo_entrada_id bigint references tipo_entrada(id) on delete restrict,
+    fecha_desde date,
+    fecha_hasta date,
+    activa boolean not null default true,
+    constraint ck_promocion_tipo check (tipo in ('2X1')),
+    constraint ck_promocion_dia check (dia_semana is null or dia_semana between 1 and 7),
+    constraint ck_promocion_fechas check (fecha_hasta is null or fecha_desde is null or fecha_hasta >= fecha_desde),
+    constraint ck_promocion_condicion check (dia_semana is not null or requiere_cantidad_par)
+); 
+
+
