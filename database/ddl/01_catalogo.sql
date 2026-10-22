@@ -182,4 +182,15 @@ create table promocion (
     constraint ck_promocion_condicion check (dia_semana is not null or requiere_cantidad_par)
 ); 
 
+-- ----------------------
+-- usuarios y roles 
+-- ---------------------- 
+
+create table rol (
+    id bigint generated always as identity primary key,
+    nombre varchar(50) not null unique,
+    descripcion varchar(200)
+);
+
+
 
