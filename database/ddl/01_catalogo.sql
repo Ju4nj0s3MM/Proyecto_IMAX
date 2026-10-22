@@ -166,3 +166,20 @@ create table tarifa (
 create unique index uq_tarifa_combinacion  
     on tarifa (tipo_entrada_id, zona_asiento_id, coalesce(dia_semana, 0), hora_desde); 
 
+create table promocion (
+    id bigint generated always as identity primary key,
+    nombre varchar(100) not null, 
+    tipo varchar(10) not null default '2X1',
+    dia_semana smallint,
+    requiere_cantidad_par boolean not null default true,
+    tipo_entrada_id bigint references tipo_entrada(id) on delete restrict,
+    fecha_desde date,
+    fecha_hasta date,
+    activa boolean not null default true,
+    constraint ck_promocion_tipo check (tipo in ('2X1')),
+    constraint ck_promocion_dia check (dia_semana is null or dia_semana between 1 and 7),
+    constraint ck_promocion_fechas check (fecha_hasta is null or fecha_desde is null or fecha_hasta >= fecha_desde),
+    constraint ck_promocion_condicion check (dia_semana is not null or require_cantidad_par)
+); 
+
+
