@@ -101,3 +101,10 @@ select p.id, s.id, ((current_date + x.dias) + x.hora) at time zone 'America/Cost
   join sala s on s.nombre = x.sala;
 
 commit;
+
+INSERT INTO rol (nombre, descripcion) VALUES
+    ('cliente',       'Espectador: cartelera, compra y consulta de sus propias entradas'),
+    ('taquillero',    'Venta presencial y corte de caja propio'),
+    ('operador_sala', 'Validación de entradas (QR) en puerta'),
+    ('contador',      'Lectura y exportación de información financiera'),
+    ('administrador', 'Configuración de cartelera, salas y precios; reembolsos; auditoría');
