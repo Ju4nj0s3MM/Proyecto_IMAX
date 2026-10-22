@@ -7,10 +7,22 @@ const $ = id => document.getElementById(id);
 const msg = $('msg');
 const ok = t => { mostrarMensaje(msg, t, 'ok'); clearTimeout(ok.t); ok.t = setTimeout(() => (msg.hidden = true), 4000); };
 const fallo = e => mostrarMensaje(msg, e.message || e, 'err');
-const estado = v => v ? '<span class="pill si">Activo</span>' : '<span class="pill no">Inactivo</span>';
+const estado = (v, fem) => v ? `<span class="pill si">Activ${fem ? 'a' : 'o'}</span>` : `<span class="pill no">Inactiv${fem ? 'a' : 'o'}</span>`;
 
 // Datos cargados de la API
-const D = { peliculas: [], cines: [], salas: [], zonas: [], clasificaciones: [], generos: [] };
+const D = { peliculas: [], cines: [], salas: [], zonas: [], clasificaciones: [], generos: [],
+            funciones: [], tipos: [], tarifas: [], promociones: [] };
+
+// Días según ISO (1 = lunes … 7 = domingo), igual que extract(isodow from ...) en PostgreSQL
+const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const OPC_DIAS = DIAS.slice(1).map((d, i) => ({ v: i + 1, t: d }));
+const dinero = v => v == null ? '—' : '$' + Number(v).toFixed(2);
+const horaCorta = h => String(h ?? '').slice(0, 5);
+const fmtHora = iso => new Date(iso).toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' });
+// ISO → valor de <input type="datetime-local"> en hora local
+const aLocal = iso => { const d = new Date(iso); return isNaN(d) ? '' : new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
+const ESTADO_FUNCION = { Activa: 'si', Cancelada: 'cancelada', Finalizada: 'no' };
+const editandoReg = () => (editando ? D[tab].find(x => x.id === editando) : null);
 const opciones = (lista, txt) => lista.map(x => ({ v: x.id, t: txt(x) }));
 
 // ---------- Definición de cada pestaña CRUD ----------
@@ -35,7 +47,7 @@ const SECCIONES = {
       { t: 'Géneros', v: p => esc(p.generos) || '<span class="muted">—</span>' },
       { t: 'Duración', v: p => `${p.duracion_min} min` },
       { t: 'Estreno', v: p => p.fecha_estreno ? '<span class="nowrap">' + esc(String(p.fecha_estreno).slice(0, 10)) + '</span>' : '<span class="muted">—</span>' },
-      { t: 'Estado', v: p => estado(p.activa) }
+      { t: 'Estado', v: p => estado(p.activa, true) }
     ],
     // generos_ids (de la lista) → generos (lo que espera la API)
     aFormulario: p => ({ ...p, generos: p.generos_ids || [] })
@@ -79,7 +91,7 @@ const SECCIONES = {
           ? `${s.asientos_activos}`
           : `<span class="aviso" title="No coincide con la capacidad declarada">${s.asientos_activos ?? 0} ⚠</span>` },
       { t: 'Limpieza', v: s => `${s.minutos_limpieza} min` },
-      { t: 'Estado', v: s => estado(s.activa) }
+      { t: 'Estado', v: s => estado(s.activa, true) }
     ],
     extra: s => `<button class="secondary chico" data-asientos="${s.id}">Asientos</button>`
   },
@@ -107,6 +119,91 @@ const SECCIONES = {
       { t: 'Código', v: c => `<strong>${esc(c.codigo)}</strong>` },
       { t: 'Descripción', v: c => esc(c.descripcion) },
       { t: 'Edad mínima', v: c => `${c.edad_minima}+` }
+    ]
+  },
+  funciones: {
+    singular: 'función', plural: 'Funciones',
+    campos: [
+      { k: 'pelicula_id', l: 'Película', type: 'select', req: true, ancho: 2,
+        opts: () => opciones(D.peliculas.filter(p => p.activa || p.id === editandoReg()?.pelicula_id), p => `${p.titulo} (${p.duracion_min} min)`) },
+      { k: 'sala_id', l: 'Sala', type: 'select', req: true, ancho: 2,
+        opts: () => opciones(D.salas.filter(s => s.activa || s.id === editandoReg()?.sala_id), s => `${s.cine} · ${s.nombre} (limpieza ${s.minutos_limpieza} min)`) },
+      { k: 'inicio', l: 'Inicio', type: 'datetime', req: true, ancho: 2 },
+      { k: 'estado', l: 'Estado', type: 'select', texto: true, req: true, def: 'Activa', vacio: false,
+        opts: () => Object.keys(ESTADO_FUNCION).map(e => ({ v: e, t: e })) },
+      { k: '_calculo', type: 'info', ancho: 4 }
+    ],
+    columnas: [
+      { t: 'Película', v: f => `<strong>${esc(f.titulo)}</strong><div class="muted">${f.duracion_min} min</div>` },
+      { t: 'Cine · Sala', v: f => `${esc(f.cine)}<div class="muted">${esc(f.sala)}</div>` },
+      { t: 'Inicio', v: f => `<span class="nowrap">${esc(fmtFecha(f.inicio))}</span>` },
+      { t: 'Fin', v: f => `<span class="nowrap">${esc(fmtHora(f.fin))}</span>` },
+      { t: 'Sala libre', v: f => `<span class="nowrap muted" title="Fin + ${f.minutos_limpieza} min de limpieza">${esc(fmtHora(f.fin_limpieza))}</span>` },
+      { t: 'Estado', v: f => `<span class="pill ${ESTADO_FUNCION[f.estado] || 'no'}">${esc(f.estado)}</span>` }
+    ],
+    extra: f => f.estado === 'Activa' ? `<button class="secondary chico" data-cancelar="${f.id}">Cancelar función</button>` : '',
+    panel: () => pintarAgenda(),
+    alCambiar: calculoFuncion
+  },
+  tipos: {
+    singular: 'tipo de entrada', plural: 'Tipos de entrada', nuevo: 'Nuevo tipo de entrada',
+    campos: [
+      { k: 'nombre', l: 'Nombre', req: true, max: 50 },
+      { k: 'descripcion', l: 'Descripción', max: 200, ancho: 2 },
+      { k: 'requiere_documento', l: 'Requiere documento en puerta (RN-06)', type: 'checkbox', def: false }
+    ],
+    columnas: [
+      { t: 'Nombre', v: t => `<strong>${esc(t.nombre)}</strong>` },
+      { t: 'Descripción', v: t => esc(t.descripcion) || '<span class="muted">—</span>' },
+      { t: 'Documento', v: t => t.requiere_documento ? '<span class="pill alerta">Se valida en puerta</span>' : '<span class="muted">No</span>' },
+      { t: 'Tarifas', v: t => t.tarifas ?? 0 }
+    ]
+  },
+  tarifas: {
+    singular: 'tarifa', plural: 'Tarifas',
+    campos: [
+      { k: 'tipo_entrada_id', l: 'Tipo de entrada', type: 'select', req: true, opts: () => opciones(D.tipos, t => t.nombre) },
+      { k: 'zona_asiento_id', l: 'Zona', type: 'select', req: true, opts: () => opciones(D.zonas, z => z.nombre) },
+      { k: 'dia_semana', l: 'Día', type: 'select', vacio: 'Todos los días', opts: () => OPC_DIAS },
+      { k: 'activa', l: 'Activa', type: 'checkbox', def: true },
+      { k: 'hora_desde', l: 'Desde', type: 'time', req: true, def: '00:00:00' },
+      { k: 'hora_hasta', l: 'Hasta', type: 'time', req: true, def: '23:59:59' },
+      { k: 'precio', l: 'Precio', type: 'number', step: '0.01', min: 0, req: true },
+      { k: 'cargo_servicio', l: 'Cargo por servicio', type: 'number', step: '0.01', min: 0, def: 0 }
+    ],
+    columnas: [
+      { t: 'Tipo', v: t => `<strong>${esc(t.tipo_entrada)}</strong>` },
+      { t: 'Zona', v: t => `<i class="punto" style="background:${colorZona(t.zona_asiento_id)}"></i> ${esc(t.zona)}` },
+      { t: 'Día', v: t => t.dia_semana ? DIAS[t.dia_semana] : '<span class="muted">Todos</span>' },
+      { t: 'Horario', v: t => `<span class="nowrap">${horaCorta(t.hora_desde)} – ${horaCorta(t.hora_hasta)}</span>` },
+      { t: 'Precio', v: t => `<strong>${dinero(t.precio)}</strong>` },
+      { t: 'Cargo', v: t => dinero(t.cargo_servicio) },
+      { t: 'Estado', v: t => estado(t.activa, true) }
+    ],
+    panel: () => pintarMatriz()
+  },
+  promociones: {
+    singular: 'promoción', plural: 'Promociones',
+    campos: [
+      { k: 'nombre', l: 'Nombre', req: true, max: 100, ancho: 2 },
+      { k: 'tipo', l: 'Tipo', type: 'select', texto: true, req: true, def: '2X1', vacio: false, opts: () => [{ v: '2X1', t: '2x1' }] },
+      { k: 'activa', l: 'Activa', type: 'checkbox', def: true },
+      { k: 'dia_semana', l: 'Día de la semana', type: 'select', vacio: 'Cualquier día', opts: () => OPC_DIAS },
+      { k: 'tipo_entrada_id', l: 'Aplica a', type: 'select', vacio: 'Todos los tipos de entrada', opts: () => opciones(D.tipos, t => t.nombre) },
+      { k: 'requiere_cantidad_par', l: 'Exige cantidad par de entradas', type: 'checkbox', def: true, ancho: 2 },
+      { k: 'fecha_desde', l: 'Vigente desde', type: 'date' },
+      { k: 'fecha_hasta', l: 'Vigente hasta', type: 'date' },
+      { k: '_ayuda', type: 'info', ancho: 2, texto: 'Debe tener al menos una condición: un día de la semana o exigir cantidad par (RN-07).' }
+    ],
+    columnas: [
+      { t: 'Nombre', v: p => `<strong>${esc(p.nombre)}</strong>` },
+      { t: 'Tipo', v: p => esc(p.tipo) },
+      { t: 'Condición', v: p => [p.dia_semana ? 'Solo ' + DIAS[p.dia_semana].toLowerCase() : '', p.requiere_cantidad_par ? 'cantidad par' : '']
+          .filter(Boolean).join(' · ') },
+      { t: 'Aplica a', v: p => esc(p.tipo_entrada) || '<span class="muted">Todos</span>' },
+      { t: 'Vigencia', v: p => !p.fecha_desde && !p.fecha_hasta ? '<span class="muted">Sin límite</span>'
+          : `<span class="nowrap">${esc(String(p.fecha_desde ?? '…').slice(0, 10))} → ${esc(String(p.fecha_hasta ?? '…').slice(0, 10))}</span>` },
+      { t: 'Estado', v: p => estado(p.activa, true) }
     ]
   },
   generos: {
@@ -153,10 +250,14 @@ function campoHTML(c) {
   if (c.type === 'textarea') return `<label${span}>${et}<textarea id="${id}" rows="3"${req}></textarea></label>`;
   if (c.type === 'select') {
     const ops = c.opts();
-    return `<label${span}>${et}<select id="${id}"${req}><option value="">— Seleccionar —</option>` +
+    const vacio = c.vacio === false ? '' : `<option value="">${esc(c.vacio || '— Seleccionar —')}</option>`;
+    return `<label${span}>${et}<select id="${id}"${c.vacio ? '' : req}>${vacio}` +
       ops.map(o => `<option value="${o.v}">${esc(o.t)}</option>`).join('') + '</select>' +
       (ops.length ? '' : `<small class="aviso">Primero crea registros en la pestaña correspondiente.</small>`) + '</label>';
   }
+  if (c.type === 'info') return `<div id="${id}" class="info muted"${span}>${esc(c.texto || '')}</div>`;
+  if (c.type === 'datetime') return `<label${span}>${et}<input id="${id}" type="datetime-local"${req}></label>`;
+  if (c.type === 'time') return `<label${span}>${et}<input id="${id}" type="time" step="1"${req}></label>`;
   if (c.type === 'checks') {
     const ops = c.opts();
     return `<fieldset class="checks"${span}><legend>${esc(c.l)}</legend>` +
@@ -180,6 +281,7 @@ function pintarFormulario() {
     img.src = url.value;
     img.onerror = () => (img.hidden = true);
   };
+  $('form').oninput = $('form').onchange = () => S.alCambiar && S.alCambiar();
 }
 
 function llenarFormulario(reg) {
@@ -192,10 +294,13 @@ function llenarFormulario(reg) {
     }
     const el = $('f-' + c.k);
     if (c.type === 'checkbox') el.checked = v ?? false;
+    else if (c.type === 'info') continue;
     else if (c.type === 'date') el.value = v ? String(v).slice(0, 10) : '';
+    else if (c.type === 'datetime') el.value = v ? aLocal(v) : '';
     else el.value = v ?? '';
   }
   const url = $('f-poster_url'); if (url) url.oninput();
+  const S = SECCIONES[tab]; if (S.alCambiar) S.alCambiar();
 }
 
 function leerFormulario() {
@@ -204,6 +309,9 @@ function leerFormulario() {
     if (c.type === 'checks') { out[c.k] = [...document.querySelectorAll(`#form input[name="${c.k}"]:checked`)].map(i => Number(i.value)); continue; }
     const el = $('f-' + c.k);
     if (c.type === 'checkbox') out[c.k] = el.checked;
+    else if (c.type === 'info') continue;
+    else if (c.type === 'datetime') out[c.k] = el.value ? new Date(el.value).toISOString() : null;
+    else if (c.type === 'select' && c.texto) out[c.k] = el.value || null;
     else if (c.type === 'number' || c.type === 'select') out[c.k] = el.value === '' ? null : Number(el.value);
     else out[c.k] = el.value.trim() === '' ? null : el.value.trim();
   }
@@ -215,7 +323,7 @@ function cancelarEdicion() {
   const S = SECCIONES[tab];
   pintarFormulario();
   llenarFormulario(null);
-  $('form-titulo').textContent = (/^(cine|género)$/.test(S.singular) ? 'Nuevo ' : 'Nueva ') + S.singular;
+  $('form-titulo').textContent = S.nuevo || (/^(cine|género)$/.test(S.singular) ? 'Nuevo ' : 'Nueva ') + S.singular;
   $('guardar').textContent = 'Crear';
   $('cancelar').hidden = true;
   document.querySelectorAll('#tabla tr.editando').forEach(tr => tr.classList.remove('editando'));
@@ -271,13 +379,114 @@ function pintarTabla() {
           <button class="danger chico" data-borrar="${r.id}">Eliminar</button></td></tr>`).join('')
       : `<tr><td colspan="${S.columnas.length + 2}" class="muted vacio-tabla">${f ? 'Sin coincidencias.' : 'Todavía no hay registros. Crea el primero arriba.'}</td></tr>`) +
     '</tbody>';
+  $('panel-extra').hidden = !S.panel;
+  if (S.panel) S.panel();
 }
+
+// ---------- Funciones: cálculo en vivo y agenda por sala ----------
+// Solo es una vista previa: el fin real lo calcula el trigger y el traslape lo impide ex_funcion_sin_traslape.
+function calculoFuncion() {
+  const info = $('f-_calculo'); if (!info) return;
+  const p = D.peliculas.find(x => x.id === Number($('f-pelicula_id').value));
+  const s = D.salas.find(x => x.id === Number($('f-sala_id').value));
+  const v = $('f-inicio').value;
+  if (!p || !s || !v) { info.textContent = 'Elige película, sala e inicio para ver a qué hora termina la función y queda libre la sala.'; info.className = 'info muted'; return; }
+  const ini = new Date(v);
+  const fin = new Date(ini.getTime() + p.duracion_min * 60000);
+  const libre = new Date(fin.getTime() + s.minutos_limpieza * 60000);
+  const choque = $('f-estado').value !== 'Cancelada' && D.funciones.find(f => f.id !== editando && f.sala_id === s.id && f.estado !== 'Cancelada' &&
+    new Date(f.inicio) < libre && ini < new Date(f.fin_limpieza));
+  info.innerHTML = `Termina a las <strong>${fmtHora(fin)}</strong> · sala libre a las <strong>${fmtHora(libre)}</strong> ` +
+    `(${p.duracion_min} min + ${s.minutos_limpieza} min de limpieza).` +
+    (choque ? ` <span class="aviso">⚠ Choca con «${esc(choque.titulo)}» (${fmtHora(choque.inicio)}–${fmtHora(choque.fin_limpieza)}); la base de datos lo va a rechazar.</span>` : '');
+  info.className = 'info';
+}
+
+let agendaFecha = null;   // 'YYYY-MM-DD' en hora local
+const fechaLocal = d => aLocal(d).slice(0, 10);
+function pintarAgenda() {
+  if (!agendaFecha) {
+    const prox = D.funciones.filter(f => f.estado === 'Activa' && new Date(f.inicio) > new Date()).sort((a, b) => a.inicio.localeCompare(b.inicio))[0];
+    agendaFecha = fechaLocal(prox ? prox.inicio : new Date());
+  }
+  const d0 = new Date(agendaFecha + 'T00:00'), d1 = new Date(d0.getTime() + 86400000);
+  const delDia = D.funciones.filter(f => new Date(f.inicio) < d1 && new Date(f.fin_limpieza) > d0);
+  const salas = D.salas.filter(s => s.activa || delDia.some(f => f.sala_id === s.id));
+  // rango visible: de 10:00 a 24:00, ampliado si hay funciones fuera
+  let h0 = 10, h1 = 24;
+  delDia.forEach(f => {
+    h0 = Math.min(h0, Math.max(0, Math.floor((new Date(f.inicio) - d0) / 3600000)));
+    h1 = Math.max(h1, Math.min(24, Math.ceil((new Date(f.fin_limpieza) - d0) / 3600000)));
+  });
+  const pct = t => Math.max(0, Math.min(100, ((t - d0) / 3600000 - h0) / (h1 - h0) * 100));
+  const horas = Array.from({ length: h1 - h0 + 1 }, (_, i) => h0 + i);
+
+  $('panel-extra').innerHTML = `<div class="card">
+    <div class="row entre"><h2 style="margin:0">Agenda por sala</h2>
+      <div class="row"><button class="secondary chico" data-dia="-1">◀</button>
+        <input type="date" id="agenda-fecha" value="${agendaFecha}"><button class="secondary chico" data-dia="1">▶</button></div></div>
+    <p class="muted">Cada barra es una función; la parte rayada es el tiempo de limpieza. Dos barras de la misma sala nunca pueden cruzarse
+      (<code>ex_funcion_sin_traslape</code>). Clic en una función para editarla.</p>
+    ${salas.length ? `<div class="agenda">
+      <div class="ag-fila ag-horas"><div class="ag-sala"></div><div class="ag-pista">${horas.map(h =>
+        `<span style="left:${(h - h0) / (h1 - h0) * 100}%">${String(h).padStart(2, '0')}:00</span>`).join('')}</div></div>
+      ${salas.map(s => `<div class="ag-fila"><div class="ag-sala" title="${esc(s.cine)}">${esc(s.nombre)}<small>${esc(s.cine)}</small></div>
+        <div class="ag-pista">${horas.map(h => `<i class="ag-linea" style="left:${(h - h0) / (h1 - h0) * 100}%"></i>`).join('')}
+        ${delDia.filter(f => f.sala_id === s.id).map(f => {
+          const a = pct(new Date(f.inicio)), b = pct(new Date(f.fin)), c = pct(new Date(f.fin_limpieza));
+          return `<button class="ag-func ${f.estado === 'Activa' ? '' : 'off'}" data-editar="${f.id}" style="left:${a}%;width:${Math.max(b - a, .5)}%"
+                    title="${esc(f.titulo)} · ${fmtHora(f.inicio)}–${fmtHora(f.fin)} · ${esc(f.estado)}">${esc(f.titulo)}<small>${fmtHora(f.inicio)}</small></button>` +
+                 `<span class="ag-limpieza ${f.estado === 'Activa' ? '' : 'off'}" style="left:${b}%;width:${c - b}%"></span>`;
+        }).join('')}</div></div>`).join('')}
+    </div>
+    ${delDia.length ? '' : '<p class="muted vacio-tabla">No hay funciones este día.</p>'}` : '<p class="aviso">No hay salas activas.</p>'}
+  </div>`;
+}
+
+// ---------- Tarifas: matriz tipo de entrada × zona ----------
+function pintarMatriz() {
+  const tipos = D.tipos, zonas = D.zonas;
+  const celda = (t, z) => D.tarifas.filter(x => x.tipo_entrada_id === t.id && x.zona_asiento_id === z.id)
+    .map(x => {
+      const cuando = (x.dia_semana ? DIAS[x.dia_semana].slice(0, 3) : 'Todos') +
+        (horaCorta(x.hora_desde) === '00:00' && horaCorta(x.hora_hasta) === '23:59' ? '' : ` ${horaCorta(x.hora_desde)}–${horaCorta(x.hora_hasta)}`);
+      return `<button class="chip${x.activa ? '' : ' off'}" data-editar="${x.id}" title="Cargo por servicio ${dinero(x.cargo_servicio)}">
+                <span>${esc(cuando)}</span><strong>${dinero(x.precio)}</strong></button>`;
+    }).join('') || '<span class="muted">—</span>';
+  $('panel-extra').innerHTML = `<div class="card">
+    <h2>Matriz de precios</h2>
+    <p class="muted">Precio por tipo de entrada y zona. "Todos" es la tarifa base; las de un día u horario específico la sustituyen. Clic para editar.</p>
+    ${tipos.length && zonas.length ? `<div class="scroll"><table class="matriz">
+      <thead><tr><th></th>${zonas.map(z => `<th><i class="punto" style="background:${colorZona(z.id)}"></i> ${esc(z.nombre)}</th>`).join('')}</tr></thead>
+      <tbody>${tipos.map(t => `<tr><th>${esc(t.nombre)}</th>${zonas.map(z => `<td>${celda(t, z)}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>` : '<p class="aviso">Crea tipos de entrada y zonas para armar la matriz.</p>'}
+  </div>`;
+}
+
+$('panel-extra').onclick = ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.editar) return editar(Number(b.dataset.editar));
+  if (b.dataset.dia) {
+    const d = new Date(agendaFecha + 'T12:00'); d.setDate(d.getDate() + Number(b.dataset.dia));
+    agendaFecha = fechaLocal(d); pintarAgenda();
+  }
+};
+$('panel-extra').onchange = ev => { if (ev.target.id === 'agenda-fecha' && ev.target.value) { agendaFecha = ev.target.value; pintarAgenda(); } };
 
 $('filtro').oninput = pintarTabla;
 $('tabla').onclick = async ev => {
   const b = ev.target.closest('button'); if (!b) return;
   if (b.dataset.editar) return editar(Number(b.dataset.editar));
   if (b.dataset.asientos) { salaActual = Number(b.dataset.asientos); return irA('asientos'); }
+  if (b.dataset.cancelar) {
+    const id = Number(b.dataset.cancelar);
+    if (!confirm(`¿Cancelar la función #${id}? Su horario queda libre para otra función.`)) return;
+    try {
+      await api(`/catalogo/admin/funciones/${id}`, { method: 'PUT', body: { estado: 'Cancelada' } });
+      ok('Función cancelada.'); await cargar('funciones'); pintarTabla();
+    } catch (e) { fallo(e); }
+    return;
+  }
   if (b.dataset.borrar) {
     const id = Number(b.dataset.borrar);
     if (!confirm(`¿Eliminar ${SECCIONES[tab].singular} #${id}? Esta acción no se puede deshacer.`)) return;

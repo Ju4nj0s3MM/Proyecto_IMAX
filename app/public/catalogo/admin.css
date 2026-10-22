@@ -7,9 +7,10 @@ code { background: var(--line); padding: 1px 5px; border-radius: 4px; font-size:
 .nowrap { white-space: nowrap; }
 
 /* Pestañas */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 16px 0; overflow-x: auto; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin: 16px 0; }
 .tabs button { background: transparent; color: var(--muted); border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; white-space: nowrap; }
 .tabs button:hover { color: var(--text); }
+.tabs .sep { width: 1px; background: var(--line); margin: 8px 6px; flex: none; }
 .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 
 /* Formulario en cuadrícula */
@@ -60,3 +61,38 @@ summary { cursor: pointer; color: var(--muted); }
 .asiento-admin:hover { outline: 2px solid var(--text); outline-offset: 1px; }
 .asiento-admin.inactivo { background: transparent; border-style: dashed; color: var(--muted); opacity: .6; }
 .inactivo-muestra { border: 2px dashed var(--muted); background: transparent !important; }
+
+/* Estados y avisos extra */
+.pill.cancelada { background: rgba(239, 68, 68, .15); color: var(--err); }
+.pill.alerta { background: rgba(234, 179, 8, .15); color: var(--bloqueado); }
+.info { grid-column: span 4; font-size: .9rem; padding: 8px 10px; border-radius: 6px; background: rgba(59, 130, 246, .08); }
+.info.muted { background: transparent; padding-left: 0; }
+
+/* Agenda de funciones por sala */
+.agenda { overflow-x: auto; }
+.ag-fila { display: flex; align-items: stretch; min-width: 760px; border-bottom: 1px solid var(--line); }
+.ag-sala { width: 150px; flex: none; padding: 8px 8px 8px 0; font-size: .85rem; display: flex; flex-direction: column; justify-content: center; }
+.ag-sala small { color: var(--muted); font-size: .72rem; }
+.ag-pista { position: relative; flex: 1; height: 52px; }
+.ag-horas .ag-pista { height: 22px; }
+.ag-horas span { position: absolute; transform: translateX(-50%); font-size: .7rem; color: var(--muted); top: 4px; }
+.ag-horas span:first-child { transform: none; }
+.ag-horas span:last-child { transform: translateX(-100%); }
+.ag-linea { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); opacity: .6; }
+.ag-func { position: absolute; top: 8px; height: 36px; padding: 2px 6px; border-radius: 6px 0 0 6px; background: var(--accent);
+  color: #fff; font-size: .75rem; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; flex-direction: column; justify-content: center; }
+.ag-func small { opacity: .8; font-size: .68rem; }
+.ag-func:hover { outline: 2px solid var(--text); z-index: 1; }
+.ag-limpieza { position: absolute; top: 8px; height: 36px; border-radius: 0 6px 6px 0;
+  background: repeating-linear-gradient(45deg, rgba(59,130,246,.35) 0 4px, rgba(59,130,246,.12) 4px 8px); }
+.ag-func.off { background: var(--ocupado); text-decoration: line-through; opacity: .6; }
+.ag-limpieza.off { opacity: .3; }
+
+/* Matriz de precios */
+table.matriz th, table.matriz td { vertical-align: top; }
+table.matriz tbody th { text-transform: none; font-size: .9rem; color: var(--text); white-space: nowrap; }
+.chip { display: flex; justify-content: space-between; gap: 10px; width: 100%; min-width: 140px; margin-bottom: 4px; padding: 4px 8px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 6px; font-size: .8rem; }
+.chip span { color: var(--muted); }
+.chip:hover { border-color: var(--accent); }
+.chip.off { opacity: .45; text-decoration: line-through; }

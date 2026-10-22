@@ -35,6 +35,39 @@ const RECURSOS = {
     cols: ['nombre'],
     select: `select g.*, (select count(*) from pelicula_genero pg where pg.genero_id = g.id)::int as peliculas
                from genero g order by g.nombre`
+    },
+  // fin y fin_limpieza los calcula el trigger trg_funcion_calcular_fin; el traslape lo impide ex_funcion_sin_traslape
+  funciones: {
+    tabla: 'funcion',
+    cols: ['pelicula_id', 'sala_id', 'inicio', 'estado'],
+    select: `select f.*, p.titulo, p.duracion_min, s.nombre as sala, s.minutos_limpieza, c.nombre as cine, c.ciudad
+               from funcion f
+               join pelicula p on p.id = f.pelicula_id
+               join sala s on s.id = f.sala_id
+               join cine c on c.id = s.cine_id
+              order by f.inicio desc, c.nombre, s.nombre`
+  },
+  tipos: {
+    tabla: 'tipo_entrada',
+    cols: ['nombre', 'descripcion', 'requiere_documento'],
+    select: `select t.*, (select count(*) from tarifa x where x.tipo_entrada_id = t.id)::int as tarifas
+               from tipo_entrada t order by t.nombre`
+  },
+  tarifas: {
+    tabla: 'tarifa',
+    cols: ['tipo_entrada_id', 'zona_asiento_id', 'dia_semana', 'hora_desde', 'hora_hasta', 'precio', 'cargo_servicio', 'activa'],
+    select: `select t.*, te.nombre as tipo_entrada, z.nombre as zona
+               from tarifa t
+               join tipo_entrada te on te.id = t.tipo_entrada_id
+               join zona_asiento z on z.id = t.zona_asiento_id
+              order by te.nombre, z.nombre, coalesce(t.dia_semana, 0), t.hora_desde`
+  },
+  promociones: {
+    tabla: 'promocion',
+    cols: ['nombre', 'tipo', 'dia_semana', 'requiere_cantidad_par', 'tipo_entrada_id', 'fecha_desde', 'fecha_hasta', 'activa'],
+    select: `select p.*, te.nombre as tipo_entrada
+               from promocion p left join tipo_entrada te on te.id = p.tipo_entrada_id
+              order by p.activa desc, p.nombre`
   }
 };
 

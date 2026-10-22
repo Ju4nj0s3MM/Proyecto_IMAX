@@ -1,8 +1,8 @@
 // MÓDULO A · Catálogo — API del panel de administración (/api/catalogo/admin/...) · DUEÑO: Mati
 // Solo rol administrador (RN-17, aplicado en el backend). Con MOCK=true usa datos en memoria con la misma forma.
 //
-//   GET/POST          /admin/{cines|salas|zonas|clasificaciones|generos}
-//   PUT/DELETE        /admin/{cines|salas|zonas|clasificaciones|generos}/:id
+//   GET/POST          /admin/{cines|salas|zonas|clasificaciones|generos|funciones|tipos|tarifas|promociones}
+//   PUT/DELETE        /admin/{...}/:id
 //   GET/POST          /admin/peliculas              (body.generos = [ids])
 //   PUT/DELETE        /admin/peliculas/:id
 //   GET               /admin/salas/:id/asientos
@@ -59,13 +59,29 @@ const MENSAJES = {
   ck_sala_limpieza: 'Los minutos de limpieza no pueden ser negativos.',
   ck_clasificacion_edad: 'La edad mínima no puede ser negativa.',
   ck_pelicula_duracion: 'La duración debe ser mayor que 0 minutos.',
-  ck_asiento_numero: 'El número de asiento debe ser mayor que 0.'
+  ck_asiento_numero: 'El número de asiento debe ser mayor que 0.',
+  ex_funcion_sin_traslape: 'La sala ya tiene otra función en ese horario (contando el tiempo de limpieza). Elige otra hora o sala.',
+  ck_funcion_estado: 'El estado debe ser Activa, Cancelada o Finalizada.',
+  ck_funcion_fin: 'La hora de fin no puede ser anterior al inicio.',
+  ck_funcion_fin_limpieza: 'El fin de limpieza no puede ser anterior al fin de la función.',
+  tipo_entrada_nombre_key: 'Ya existe un tipo de entrada con ese nombre.',
+  uq_tarifa_combinacion: 'Ya existe una tarifa para ese tipo de entrada, zona, día y hora de inicio.',
+  ck_tarifa_dia: 'El día de la semana debe estar entre 1 (lunes) y 7 (domingo).',
+  ck_tarifa_horas: 'La hora "hasta" debe ser mayor que la hora "desde".',
+  ck_tarifa_precio: 'El precio no puede ser negativo.',
+  ck_tarifa_cargo: 'El cargo por servicio no puede ser negativo.',
+  ck_promocion_tipo: 'El único tipo de promoción permitido es 2X1.',
+  ck_promocion_dia: 'El día de la semana debe estar entre 1 (lunes) y 7 (domingo).',
+  ck_promocion_fechas: 'La fecha "hasta" no puede ser anterior a la fecha "desde".',
+  ck_promocion_condicion: 'La promoción necesita una condición: un día de la semana o exigir cantidad par de entradas.'
 };
-const TABLAS = { sala: 'salas', asiento: 'asientos', pelicula: 'películas', pelicula_genero: 'películas', funcion: 'funciones', boleto: 'boletos' };
+const TABLAS = { sala: 'salas', asiento: 'asientos', pelicula: 'películas', pelicula_genero: 'películas', funcion: 'funciones',
+                 tarifa: 'tarifas', promocion: 'promociones', boleto: 'boletos' };
 
 router.use((err, req, res, next) => {
   const porConstraint = MENSAJES[err.constraint];
   switch (err.code) {
+    case '23P01': return res.status(409).json({ error: porConstraint || 'El registro choca con otro existente.' });
     case '23505': return res.status(409).json({ error: porConstraint || 'Ya existe un registro con esos datos.' });
     case '23514': return res.status(400).json({ error: porConstraint || 'Algún valor no cumple las reglas de la tabla.' });
     case '23502': return res.status(400).json({ error: `Falta el campo obligatorio: ${err.column}.` });

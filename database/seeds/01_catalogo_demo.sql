@@ -60,4 +60,44 @@ select p.id, g.id
   join pelicula p on p.titulo = x.titulo
   join genero g on g.nombre = x.genero;
 
+-- Tipos de entrada (RN-06: los que requieren documento se validan en puerta)
+insert into tipo_entrada (nombre, descripcion, requiere_documento) values
+  ('Adulto',       'Tarifa general', false),
+  ('Niño',         'Menores de 12 años', true),
+  ('Adulto mayor', 'Ciudadano de oro (65+)', true),
+  ('Estudiante',   'Con carné vigente', true);
+
+-- Tarifas base (todos los días, todo el día) por tipo × zona; VIP cuesta 4.00 más
+insert into tarifa (tipo_entrada_id, zona_asiento_id, precio, cargo_servicio)
+select t.id, z.id, b.precio + case z.nombre when 'VIP' then 4 else 0 end, 0.75
+  from (values ('Adulto', 8.50), ('Niño', 6.00), ('Adulto mayor', 5.50), ('Estudiante', 6.50)) b(tipo, precio)
+  join tipo_entrada t on t.nombre = b.tipo
+  cross join zona_asiento z;
+
+-- Martes de descuento para Adulto en zona General, y matiné (10:00 a 14:59) para Adulto en General
+insert into tarifa (tipo_entrada_id, zona_asiento_id, dia_semana, precio, cargo_servicio)
+select t.id, z.id, 2, 6.00, 0.75 from tipo_entrada t, zona_asiento z where t.nombre = 'Adulto' and z.nombre = 'General';
+insert into tarifa (tipo_entrada_id, zona_asiento_id, hora_desde, hora_hasta, precio, cargo_servicio)
+select t.id, z.id, '10:00', '14:59:59', 7.00, 0.75 from tipo_entrada t, zona_asiento z where t.nombre = 'Adulto' and z.nombre = 'General';
+
+-- Promociones 2x1 (RN-07)
+insert into promocion (nombre, dia_semana, requiere_cantidad_par, tipo_entrada_id) values
+  ('2x1 los miércoles', 3, true, null);
+insert into promocion (nombre, requiere_cantidad_par, tipo_entrada_id, fecha_desde, fecha_hasta)
+select '2x1 estudiantes', true, id, current_date, current_date + 60 from tipo_entrada where nombre = 'Estudiante';
+
+-- Funciones de los próximos dos días (hora de Costa Rica). fin y fin_limpieza los calcula el trigger.
+insert into funcion (pelicula_id, sala_id, inicio)
+select p.id, s.id, ((current_date + x.dias) + x.hora) at time zone 'America/Costa_Rica'
+  from (values ('Dune: Parte Tres', 'Sala 1 IMAX Laser', 1, time '14:00'),
+               ('Dune: Parte Tres', 'Sala 1 IMAX Laser', 1, time '17:30'),
+               ('Océano Profundo',  'Sala 1 IMAX Laser', 1, time '21:00'),
+               ('Océano Profundo',  'Sala 1',            1, time '15:00'),
+               ('La Noche Eterna',  'Sala 1',            1, time '20:00'),
+               ('La Noche Eterna',  'Sala Premium',      1, time '19:00'),
+               ('Dune: Parte Tres', 'Sala 1 IMAX Laser', 2, time '18:00'),
+               ('Océano Profundo',  'Sala 2',            2, time '16:00')) x(titulo, sala, dias, hora)
+  join pelicula p on p.titulo = x.titulo
+  join sala s on s.nombre = x.sala;
+
 commit;

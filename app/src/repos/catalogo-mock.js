@@ -33,8 +33,26 @@ const db = {
     { id: 1, titulo: 'Dune: Parte Tres', sinopsis: 'La saga continúa en Arrakis.', duracion_min: 165, poster_url: null, clasificacion_id: 2, fecha_estreno: '2026-12-18', activa: true, creado_en: ahora() },
     { id: 2, titulo: 'Océano Profundo', sinopsis: 'Documental inmersivo filmado con cámaras IMAX.', duracion_min: 45, poster_url: null, clasificacion_id: 1, fecha_estreno: null, activa: true, creado_en: ahora() }
   ],
-  pelicula_genero: [{ pelicula_id: 1, genero_id: 1 }, { pelicula_id: 1, genero_id: 3 }, { pelicula_id: 2, genero_id: 2 }]
+  pelicula_genero: [{ pelicula_id: 1, genero_id: 1 }, { pelicula_id: 1, genero_id: 3 }, { pelicula_id: 2, genero_id: 2 }],
+  funcion: [],
+  tipo_entrada: [
+    { id: 1, nombre: 'Adulto', descripcion: 'Tarifa general', requiere_documento: false },
+    { id: 2, nombre: 'Niño', descripcion: 'Menores de 12 años', requiere_documento: true },
+    { id: 3, nombre: 'Adulto mayor', descripcion: 'Ciudadano de oro (65+)', requiere_documento: true },
+    { id: 4, nombre: 'Estudiante', descripcion: 'Con carné vigente', requiere_documento: true }
+  ],
+  tarifa: [],
+  promocion: [
+    { id: 1, nombre: '2x1 los miércoles', tipo: '2X1', dia_semana: 3, requiere_cantidad_par: true, tipo_entrada_id: null, fecha_desde: null, fecha_hasta: null, activa: true },
+    { id: 2, nombre: '2x1 estudiantes', tipo: '2X1', dia_semana: null, requiere_cantidad_par: true, tipo_entrada_id: 4, fecha_desde: null, fecha_hasta: null, activa: true }
+  ]
 };
+
+// Tarifas de ejemplo: precio base por tipo × zona (todos los días), más martes de descuento para Adulto/General
+[[1, 8.5], [2, 6], [3, 5.5], [4, 6.5]].forEach(([tipo, base]) => [[1, 0], [2, 4], [3, 0]].forEach(([zona, extra]) =>
+  db.tarifa.push({ id: ++seq, tipo_entrada_id: tipo, zona_asiento_id: zona, dia_semana: null, hora_desde: '00:00:00', hora_hasta: '23:59:59',
+                   precio: base + extra, cargo_servicio: 0.75, activa: true })));
+db.tarifa.push({ id: ++seq, tipo_entrada_id: 1, zona_asiento_id: 1, dia_semana: 2, hora_desde: '00:00:00', hora_hasta: '23:59:59', precio: 6, cargo_servicio: 0.75, activa: true });
 
 // Asientos de ejemplo: sala 1 = 8×10 (A-C VIP), sala 2 = 6×8
 function generar(salaId, filas, porFila, zonas) {
@@ -47,6 +65,29 @@ function generar(salaId, filas, porFila, zonas) {
 }
 generar(1, 8, 10, [2, 2, 2, 1, 1, 1, 1, 3]);
 generar(2, 6, 8, [1, 1, 1, 1, 2, 2]);
+
+// Imita trg_funcion_calcular_fin: fin = inicio + duración; fin_limpieza = fin + minutos de limpieza de la sala
+function calcularFin(f) {
+  const p = db.pelicula.find(x => x.id === Number(f.pelicula_id));
+  const s = db.sala.find(x => x.id === Number(f.sala_id));
+  if (!p || !s) throw Object.assign(err(400, `Película ${f.pelicula_id} o sala ${f.sala_id} inexistente`), { code: 'P0001' });
+  const ini = new Date(f.inicio);
+  if (isNaN(ini)) throw Object.assign(err(400, 'Fecha inválida'), { code: '22007' });
+  f.inicio = ini.toISOString();
+  f.fin = new Date(ini.getTime() + p.duracion_min * 60000).toISOString();
+  f.fin_limpieza = new Date(ini.getTime() + (p.duracion_min + s.minutos_limpieza) * 60000).toISOString();
+}
+// Funciones de ejemplo: mañana y pasado mañana
+{
+  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(15, 0, 0, 0);
+  [[1, 1, 0], [2, 1, 4], [2, 2, 1], [1, 2, 5], [2, 1, 24 + 2]].forEach(([peli, sala, horas]) => {
+    const f = { id: ++seq, pelicula_id: peli, sala_id: sala, inicio: new Date(d.getTime() + horas * 3600000).toISOString(), estado: 'Activa', creado_en: ahora() };
+    calcularFin(f);
+    db.funcion.push(f);
+  });
+}
+const DIA_OK = d => d == null || (d >= 1 && d <= 7);
+const hora = h => (h == null ? h : String(h).length === 5 ? h + ':00' : String(h));
 
 // ---- Restricciones del DDL ----
 const RESTRICCIONES = {
@@ -73,19 +114,48 @@ const RESTRICCIONES = {
     req: ['titulo', 'sinopsis', 'duracion_min', 'clasificacion_id'], fk: { clasificacion_id: 'clasificacion' },
     check: r => !(r.duracion_min > 0) && 'ck_pelicula_duracion', defaults: { activa: true }
   },
-  asiento: { req: ['zona_asiento_id'], fk: { zona_asiento_id: 'zona_asiento' }, defaults: {} }
+  asiento: { req: ['zona_asiento_id'], fk: { zona_asiento_id: 'zona_asiento' }, defaults: {} },
+  funcion: {
+    antes: calcularFin,   // el trigger corre antes de los NOT NULL
+    req: ['pelicula_id', 'sala_id', 'inicio', 'fin', 'fin_limpieza', 'estado'], fk: { pelicula_id: 'pelicula', sala_id: 'sala' },
+    check: r => !['Activa', 'Cancelada', 'Finalizada'].includes(r.estado) && 'ck_funcion_estado',
+    // ex_funcion_sin_traslape: misma sala, rangos [inicio, fin_limpieza) que se cruzan, ignorando canceladas
+    excl: (r, id) => r.estado !== 'Cancelada' && db.funcion.some(x => x.id !== id && x.sala_id === r.sala_id && x.estado !== 'Cancelada' &&
+            new Date(x.inicio) < new Date(r.fin_limpieza) && new Date(r.inicio) < new Date(x.fin_limpieza)) && 'ex_funcion_sin_traslape',
+    defaults: { estado: 'Activa' }
+  },
+  tipo_entrada: { req: ['nombre'], unique: [['nombre']], uqName: ['tipo_entrada_nombre_key'], defaults: { requiere_documento: false } },
+  tarifa: {
+    antes: r => { r.hora_desde = hora(r.hora_desde); r.hora_hasta = hora(r.hora_hasta); },
+    req: ['tipo_entrada_id', 'zona_asiento_id', 'hora_desde', 'hora_hasta', 'precio', 'cargo_servicio'],
+    fk: { tipo_entrada_id: 'tipo_entrada', zona_asiento_id: 'zona_asiento' },
+    unique: [['tipo_entrada_id', 'zona_asiento_id', 'dia_semana', 'hora_desde']], uqName: ['uq_tarifa_combinacion'],
+    check: r => (!DIA_OK(r.dia_semana) && 'ck_tarifa_dia') || (!(r.hora_hasta > r.hora_desde) && 'ck_tarifa_horas') ||
+                (!(r.precio >= 0) && 'ck_tarifa_precio') || (!(r.cargo_servicio >= 0) && 'ck_tarifa_cargo'),
+    defaults: { hora_desde: '00:00:00', hora_hasta: '23:59:59', cargo_servicio: 0, activa: true }
+  },
+  promocion: {
+    req: ['nombre', 'tipo', 'requiere_cantidad_par'], fk: { tipo_entrada_id: 'tipo_entrada' }, fkOpcional: true,
+    check: r => (r.tipo !== '2X1' && 'ck_promocion_tipo') || (!DIA_OK(r.dia_semana) && 'ck_promocion_dia') ||
+                (r.fecha_desde && r.fecha_hasta && r.fecha_hasta < r.fecha_desde && 'ck_promocion_fechas') ||
+                (r.dia_semana == null && !r.requiere_cantidad_par && 'ck_promocion_condicion'),
+    defaults: { tipo: '2X1', requiere_cantidad_par: true, activa: true }
+  }
 };
 
 // Qué tablas apuntan a cuál (para simular ON DELETE RESTRICT)
 const REFERENCIAS = {
   cine: [['sala', 'cine_id']],
-  sala: [['asiento', 'sala_id']],
-  zona_asiento: [['asiento', 'zona_asiento_id']],
+  sala: [['asiento', 'sala_id'], ['funcion', 'sala_id']],
+  pelicula: [['funcion', 'pelicula_id']],
+  zona_asiento: [['asiento', 'zona_asiento_id'], ['tarifa', 'zona_asiento_id']],
+  tipo_entrada: [['tarifa', 'tipo_entrada_id'], ['promocion', 'tipo_entrada_id']],
   clasificacion: [['pelicula', 'clasificacion_id']],
   genero: [['pelicula_genero', 'genero_id']]
 };
 
-const NUM = ['latitud', 'longitud', 'capacidad', 'minutos_limpieza', 'edad_minima', 'duracion_min', 'cine_id', 'clasificacion_id', 'zona_asiento_id'];
+const NUM = ['latitud', 'longitud', 'capacidad', 'minutos_limpieza', 'edad_minima', 'duracion_min', 'cine_id', 'clasificacion_id', 'zona_asiento_id',
+             'pelicula_id', 'sala_id', 'tipo_entrada_id', 'dia_semana', 'precio', 'cargo_servicio'];
 function normalizar(data) {
   for (const k of Object.keys(data)) {
     if (data[k] === '') data[k] = null;
@@ -96,8 +166,10 @@ function normalizar(data) {
 
 function validar(tabla, fila, id) {
   const R = RESTRICCIONES[tabla];
+  if (R.antes) R.antes(fila);
   for (const c of R.req) if (fila[c] == null || fila[c] === '') throw Object.assign(err(400, `Falta el campo obligatorio: ${c}`), { code: '23502', column: c });
   for (const [c, ref] of Object.entries(R.fk || {})) {
+    if (fila[c] == null && R.fkOpcional) continue;
     if (!db[ref].some(x => x.id === Number(fila[c]))) throw Object.assign(err(409, 'Referencia inexistente'), { code: '23503' });
   }
   (R.unique || []).forEach((cols, i) => {
@@ -106,6 +178,8 @@ function validar(tabla, fila, id) {
   });
   const ck = R.check && R.check(fila);
   if (ck) throw Object.assign(err(400, 'Check'), { code: '23514', constraint: ck });
+  const ex = R.excl && R.excl(fila, id);
+  if (ex) throw Object.assign(err(409, 'Traslape'), { code: '23P01', constraint: ex });
 }
 
 function pick(body, cols) {
@@ -118,7 +192,7 @@ function insertar(tabla, cols, body) {
   const fila = { ...RESTRICCIONES[tabla].defaults, ...pick(body, cols) };
   validar(tabla, fila, null);
   const nueva = { id: ++seq, ...fila };
-  if (['cine', 'sala', 'pelicula'].includes(tabla)) nueva.creado_en = ahora();
+  if (['cine', 'sala', 'pelicula', 'funcion'].includes(tabla)) nueva.creado_en = ahora();
   db[tabla].push(nueva);
   return nueva;
 }
@@ -147,7 +221,11 @@ const RECURSOS = {
   salas: { tabla: 'sala', cols: ['cine_id', 'nombre', 'capacidad', 'minutos_limpieza', 'activa'] },
   zonas: { tabla: 'zona_asiento', cols: ['nombre', 'descripcion'] },
   clasificaciones: { tabla: 'clasificacion', cols: ['codigo', 'descripcion', 'edad_minima'] },
-  generos: { tabla: 'genero', cols: ['nombre'] }
+  generos: { tabla: 'genero', cols: ['nombre'] },
+  funciones: { tabla: 'funcion', cols: ['pelicula_id', 'sala_id', 'inicio', 'estado'] },
+  tipos: { tabla: 'tipo_entrada', cols: ['nombre', 'descripcion', 'requiere_documento'] },
+  tarifas: { tabla: 'tarifa', cols: ['tipo_entrada_id', 'zona_asiento_id', 'dia_semana', 'hora_desde', 'hora_hasta', 'precio', 'cargo_servicio', 'activa'] },
+  promociones: { tabla: 'promocion', cols: ['nombre', 'tipo', 'dia_semana', 'requiere_cantidad_par', 'tipo_entrada_id', 'fecha_desde', 'fecha_hasta', 'activa'] }
 };
 const PELICULA_COLS = ['titulo', 'sinopsis', 'duracion_min', 'poster_url', 'clasificacion_id', 'fecha_estreno', 'activa'];
 
@@ -163,7 +241,20 @@ const VISTAS = {
     .sort((a, b) => a.nombre.localeCompare(b.nombre)),
   clasificaciones: () => [...db.clasificacion].sort((a, b) => a.edad_minima - b.edad_minima || a.codigo.localeCompare(b.codigo)),
   generos: () => db.genero.map(g => ({ ...g, peliculas: db.pelicula_genero.filter(x => x.genero_id === g.id).length }))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+  funciones: () => db.funcion.map(f => {
+    const p = db.pelicula.find(x => x.id === f.pelicula_id) || {};
+    const s = db.sala.find(x => x.id === f.sala_id) || {};
+    const c = db.cine.find(x => x.id === s.cine_id) || {};
+    return { ...f, titulo: p.titulo, duracion_min: p.duracion_min, sala: s.nombre, minutos_limpieza: s.minutos_limpieza, cine: c.nombre, ciudad: c.ciudad };
+  }).sort((a, b) => b.inicio.localeCompare(a.inicio)),
+  tipos: () => db.tipo_entrada.map(t => ({ ...t, tarifas: db.tarifa.filter(x => x.tipo_entrada_id === t.id).length }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+  tarifas: () => db.tarifa.map(t => ({ ...t, tipo_entrada: (db.tipo_entrada.find(x => x.id === t.tipo_entrada_id) || {}).nombre,
+                                       zona: (db.zona_asiento.find(x => x.id === t.zona_asiento_id) || {}).nombre }))
+    .sort((a, b) => (a.tipo_entrada + a.zona).localeCompare(b.tipo_entrada + b.zona) || (a.dia_semana || 0) - (b.dia_semana || 0) || a.hora_desde.localeCompare(b.hora_desde)),
+  promociones: () => db.promocion.map(p => ({ ...p, tipo_entrada: p.tipo_entrada_id ? (db.tipo_entrada.find(x => x.id === p.tipo_entrada_id) || {}).nombre : null }))
+    .sort((a, b) => (b.activa - a.activa) || a.nombre.localeCompare(b.nombre))
 };
 
 function setGeneros(peliculaId, generos) {
