@@ -136,4 +136,16 @@ create trigger trg_funcion_calcular_fin
     before insert or update on pelicula_id, sala_id, inicio on funcion
     for each row execute function trg_funcion_calcular_fin();
 
+-- ----------------------
+-- tipos de entradas promociones tarifas entre otros precios
+-- ----------------------
+
+create table tipo_entrada(
+    id bigint generated always as identity primary key,
+    nombre varchar(50) not null unique,
+    descripcion varchar(200),
+    require_documento boolean not null default false,
+);
+
+
 
