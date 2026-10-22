@@ -44,3 +44,16 @@ El control de acceso se aplica en dos capas, para que una falla en una no abra l
 | RN-19 | Limita los reembolsos a la política vigente, salvo un reembolso forzado que queda auditado |
 | RN-20 | Registra fecha, hora, dirección IP, rol y usuario de cada operación manual |
 
+## 5. Casos de verificación
+
+| Caso | Resultado esperado |
+|---|---|
+| Un cliente intenta abrir el panel de configuración de salas | Acceso denegado (403) |
+| Un taquillero intenta modificar un precio | Acceso denegado (403) |
+| Un operador de sala intenta registrar una venta | Acceso denegado (403) |
+| Un contador intenta crear una función | Acceso denegado (403) |
+| Un administrador intenta modificar una sala con entradas vendidas | Operación rechazada por RN-18 |
+| Un rol de aplicación intenta hacer `UPDATE` o `DELETE` sobre una bitácora | Permiso denegado por la base de datos |
+| Un administrador otorga una cortesía o fuerza un reembolso | Operación permitida y registrada con usuario, rol, fecha, hora e IP |
+| Un usuario con la cuenta bloqueada por intentos fallidos intenta iniciar sesión | Acceso rechazado hasta que termine el bloqueo |
+
