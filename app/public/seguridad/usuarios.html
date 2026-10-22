@@ -1,0 +1,82 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Usuarios y roles</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/css/styles.css"><link rel="stylesheet" href="/catalogo/admin.css"><link rel="stylesheet" href="/seguridad/usuarios.css"></head>
+<body>
+<main class="ancho">
+  <h1>Usuarios y roles</h1>
+  <p class="muted">Cuentas del sistema y sus roles (tablas <code>usuario</code>, <code>rol</code> y <code>usuario_rol</code>).
+     Las contraseñas se guardan como hash bcrypt dentro de la base de datos. Solo rol <strong>administrador</strong> (RN-17).</p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="usuarios">Usuarios</button>
+    <button role="tab" data-tab="roles">Roles</button>
+  </div>
+
+  <div id="msg" class="msg" hidden></div>
+
+  <!-- ===== Usuarios ===== -->
+  <section id="tab-usuarios" hidden>
+    <div class="card">
+      <h2 id="u-titulo">Nuevo usuario</h2>
+      <form id="u-form" class="grid-form" autocomplete="off">
+        <label><span>Nombre <b class="req">*</b></span><input id="u-nombre" maxlength="100" required></label>
+        <label><span>Apellido <b class="req">*</b></span><input id="u-apellido" maxlength="100" required></label>
+        <label style="grid-column: span 2"><span>Correo <b class="req">*</b></span><input id="u-email" type="email" maxlength="150" required></label>
+        <label><span>Teléfono</span><input id="u-telefono" maxlength="20" placeholder="8888-8888"></label>
+        <label style="grid-column: span 2"><span id="u-pass-label">Contraseña <b class="req">*</b></span>
+          <div class="con-preview">
+            <input id="u-password" type="password" minlength="8" maxlength="72" autocomplete="new-password">
+            <button type="button" class="secondary chico" id="u-ver" title="Mostrar u ocultar">👁</button>
+          </div>
+          <small class="muted" id="u-pass-ayuda">Mínimo 8 caracteres.</small>
+        </label>
+        <label class="check"><input id="u-activo" type="checkbox" checked> Activo</label>
+        <fieldset class="checks roles-checks" style="grid-column: span 4">
+          <legend>Roles</legend>
+          <div id="u-roles"></div>
+        </fieldset>
+      </form>
+      <div class="acciones">
+        <button type="submit" form="u-form" id="u-guardar">Crear</button>
+        <button type="button" class="secondary" id="u-cancelar" hidden>Cancelar edición</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row entre">
+        <h2 id="u-tabla-titulo" style="margin:0">Usuarios</h2>
+        <div class="row">
+          <label class="buscar">Rol <select id="u-filtro-rol"><option value="">Todos</option></select></label>
+          <label class="buscar">Buscar <input id="u-filtro" type="search" placeholder="Nombre, correo…"></label>
+        </div>
+      </div>
+      <div id="u-resumen" class="resumen-roles"></div>
+      <div class="scroll"><table id="u-tabla"></table></div>
+    </div>
+  </section>
+
+  <!-- ===== Roles ===== -->
+  <section id="tab-roles" hidden>
+    <div class="card">
+      <h2 id="r-titulo">Nuevo rol</h2>
+      <form id="r-form" class="grid-form" autocomplete="off">
+        <label><span>Nombre <b class="req">*</b></span><input id="r-nombre" maxlength="50" required></label>
+        <label style="grid-column: span 3"><span>Descripción</span><input id="r-descripcion" maxlength="200"></label>
+        <div id="r-aviso" class="info muted" hidden></div>
+      </form>
+      <div class="acciones">
+        <button type="submit" form="r-form" id="r-guardar">Crear</button>
+        <button type="button" class="secondary" id="r-cancelar" hidden>Cancelar edición</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2 id="r-tabla-titulo">Roles</h2>
+      <p class="muted">Los 5 <strong>roles del sistema</strong> los usa la app por nombre para decidir qué ve cada quien (matriz de privilegio mínimo),
+         por eso no se pueden renombrar ni eliminar.</p>
+      <div class="scroll"><table id="r-tabla"></table></div>
+    </div>
+  </section>
+</main>
+<script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required" data-roles="administrador"></script>
+<script src="/seguridad/usuarios.js"></script>
+</body></html>

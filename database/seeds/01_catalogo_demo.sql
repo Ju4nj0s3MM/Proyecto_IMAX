@@ -101,3 +101,26 @@ select p.id, s.id, ((current_date + x.dias) + x.hora) at time zone 'America/Cost
   join sala s on s.nombre = x.sala;
 
 commit;
+
+INSERT INTO rol (nombre, descripcion) VALUES
+    ('cliente',       'Espectador: cartelera, compra y consulta de sus propias entradas'),
+    ('taquillero',    'Venta presencial y corte de caja propio'),
+    ('operador_sala', 'Validación de entradas (QR) en puerta'),
+    ('contador',      'Lectura y exportación de información financiera'),
+    ('administrador', 'Configuración de cartelera, salas y precios; reembolsos; auditoría');
+
+-- Usuarios de DEMOSTRACIÓN, uno por rol. Contraseña de todos: Imax2026!  (solo para pruebas locales)
+-- La contraseña se guarda como hash bcrypt con pgcrypto; nunca en texto plano.
+insert into usuario (nombre, apellido, email, password_hash, telefono)
+values ('Ana',    'Cliente',  'cliente@imax.test',    crypt('Imax2026!', gen_salt('bf')), '8888-0001'),
+       ('Tomás',  'Taquilla', 'taquilla@imax.test',   crypt('Imax2026!', gen_salt('bf')), '8888-0002'),
+       ('Olga',   'Operadora','operador@imax.test',   crypt('Imax2026!', gen_salt('bf')), null),
+       ('Carlos', 'Contador', 'contador@imax.test',   crypt('Imax2026!', gen_salt('bf')), null),
+       ('Admin',  'IMAX',     'admin@imax.test',      crypt('Imax2026!', gen_salt('bf')), null);
+
+insert into usuario_rol (usuario_id, rol_id)
+select u.id, r.id
+  from (values ('cliente@imax.test', 'cliente'), ('taquilla@imax.test', 'taquillero'), ('operador@imax.test', 'operador_sala'),
+               ('contador@imax.test', 'contador'), ('admin@imax.test', 'administrador')) x(email, rol)
+  join usuario u on u.email = x.email
+  join rol r on r.nombre = x.rol;
