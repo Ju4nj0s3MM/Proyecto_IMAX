@@ -112,3 +112,28 @@ create table funcion (
         where (estado <> 'Cancelada')
 );
 
+
+-- ocupamos antes de seguir con otras funciones un trigger para que funcione la tabla anterior
+
+create function trg_funcion_calcular_fin() returns trigger 
+language plpgsql as $$
+declare
+    v_duracion integer;
+    v_limpieza integer;
+begin 
+    select duracion_min into v_duracion from pelicula where id = new.pelicula_id;
+    select minutos_limpieza into v_limpieza from sala where id = new.sala_id;
+    if v_duracion is null or v_limpieza is null then 
+        raise exception 'Película o sala inexistente',
+            new.pelicula_id, new.sala_id;
+    end if;
+    new.fin := new.inicio + make_interval(mins => v_duracion);
+    new.fin_limpieza := new.fin + make_interval(mins => v_limpieza);
+    return new;
+end $$; 
+
+create trigger trg_funcion_calcular_fin
+    before insert or update on pelicula_id, sala_id, inicio on funcion
+    for each row execute function trg_funcion_calcular_fin();
+
+
