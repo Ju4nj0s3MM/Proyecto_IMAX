@@ -204,6 +204,6 @@ create table usuario (
     constraint ck_usuario_email check (email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$')
 );
 
-
+create unique index uq_usuario_email on usuario(lower(email)); 
 
 
