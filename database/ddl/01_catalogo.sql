@@ -192,5 +192,18 @@ create table rol (
     descripcion varchar(200)
 );
 
+create table usuario (
+    id bigint generated always as identity primary key,
+    nombre varchar(100) not null,
+    apellido varchar(100) not null,
+    email varchar(150) not null,
+    password_hash varchar(200) not null,
+    telefono varchar(20),
+    activo boolean not null default true,
+    creado_en timestamptz not null default now(),
+    constraint ck_usuario_email check (email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$')
+);
+
+
 
 
