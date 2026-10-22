@@ -124,7 +124,7 @@ begin
     select duracion_min into v_duracion from pelicula where id = new.pelicula_id;
     select minutos_limpieza into v_limpieza from sala where id = new.sala_id;
     if v_duracion is null or v_limpieza is null then 
-        raise exception 'Película o sala inexistente',
+        raise exception 'Película % o sala % inexistente',
             new.pelicula_id, new.sala_id;
     end if;
     new.fin := new.inicio + make_interval(mins => v_duracion);
@@ -133,7 +133,7 @@ begin
 end $$; 
 
 create trigger trg_funcion_calcular_fin
-    before insert or update on pelicula_id, sala_id, inicio on funcion
+    before insert or update of pelicula_id, sala_id, inicio on funcion
     for each row execute function trg_funcion_calcular_fin();
 
 -- ----------------------
@@ -144,7 +144,7 @@ create table tipo_entrada(
     id bigint generated always as identity primary key,
     nombre varchar(50) not null unique,
     descripcion varchar(200),
-    require_documento boolean not null default false,
+    requiere_documento boolean not null default false
 );
 
 create table tarifa (
@@ -179,7 +179,7 @@ create table promocion (
     constraint ck_promocion_tipo check (tipo in ('2X1')),
     constraint ck_promocion_dia check (dia_semana is null or dia_semana between 1 and 7),
     constraint ck_promocion_fechas check (fecha_hasta is null or fecha_desde is null or fecha_hasta >= fecha_desde),
-    constraint ck_promocion_condicion check (dia_semana is not null or require_cantidad_par)
+    constraint ck_promocion_condicion check (dia_semana is not null or requiere_cantidad_par)
 ); 
 
 
