@@ -78,7 +78,7 @@ create table pelicula (
     titulo varchar(200) not null, 
     sinopsis text not null,
     duracion_min integer not null,
-    porter_url varchar(250),
+    poster_url varchar(250),
     clasificacion_id bigint not null references clasificacion(id) on delete restrict, 
     fecha_estreno date,
     activa boolean not null default true,
