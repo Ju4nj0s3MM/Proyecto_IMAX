@@ -147,5 +147,22 @@ create table tipo_entrada(
     require_documento boolean not null default false,
 );
 
+create table tarifa (
+    id bigint generated always as identity primary key,
+    tipo_entrada_id bigint not null references tipo_entrada(id) on delete restrict,
+    zona_asiento_id bigint not null references zona_asiento(id) on delete restrict,
+    dia_semana smallint, 
+    hora_desde time not null default '00:00:00',
+    hora_hasta time not null default '23:59:59',
+    precio numeric(12,2) not null,
+    cargo_servicio numeric(12,2) not null default 0,
+    activa boolean not null default true,
+    constraint ck_tarifa_dia check (dia_semana is null or dia_semana between 1 and 7),
+    constraint ck_tarifa_horas check (hora_hasta > hora_desde),
+    constraint ck_tarifa_precio check (precio >= 0),
+    constraint ck_tarifa_cargo check (cargo_servicio >= 0)
+);
 
+create unique index uq_tarifa_combinacion  
+    on tarifa (tipo_entrada_id, zona_asiento_id, coalesce(dia_semana, 0), hora_desde); 
 
