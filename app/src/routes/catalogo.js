@@ -18,14 +18,14 @@ router.post('/total', wrap(async (req, res) => {
   res.json(await call('SELECT * FROM fn_calcular_total($1::bigint[], $2::bigint[])', [asientos, tipos]));
 }));
 
-// TODO (Mati): CRUD de administración. Debe llamar a INSERT/UPDATE o funciones SQL (los triggers RN-18 y RN-20 los dispara la BD).
-router.get('/admin/peliculas',  requireRole('administrador'), (req, res) => res.status(501).json({ error: 'TODO Mati: listar películas' }));
-router.post('/admin/peliculas', requireRole('administrador'), (req, res) => res.status(501).json({ error: 'TODO Mati: alta de película (con póster)' }));
-router.post('/admin/salas',     requireRole('administrador'), (req, res) => res.status(501).json({ error: 'TODO Mati: configuración de sala y asientos' }));
+// TODO (Mati): funciones y tarifas cuando existan sus tablas (los triggers RN-18 y RN-20 los dispara la BD).
 router.post('/admin/funciones', requireRole('administrador'), (req, res) => res.status(501).json({ error: 'TODO Mati: programar función (sin traslapes)' }));
 router.post('/admin/tarifas',   requireRole('administrador'), (req, res) => res.status(501).json({ error: 'TODO Mati: matriz de precios y promociones' }));
 
 // TODO (Mati): consulta analítica #2 (Top 5 de la semana) y datos del dashboard
 router.get('/reportes/top5', requireRole('administrador', 'contador'), (req, res) => res.status(501).json({ error: 'TODO Mati: top 5 última semana' }));
+
+// CRUD de cines, salas, asientos, zonas, clasificaciones, géneros y películas (tablas de 01_catalogo.sql)
+router.use('/admin', require('./catalogo-admin'));
 
 module.exports = router;
