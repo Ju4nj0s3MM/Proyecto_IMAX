@@ -5,6 +5,7 @@
 --                  =============================================================
 
 create extension if not exists btree_gist; 
+create extension if not exists pgcrypto;   -- crypt()/gen_salt() para guardar password_hash (bcrypt) dentro de la BD
 
 
 -- --------------
@@ -208,7 +209,7 @@ create unique index uq_usuario_email on usuario(lower(email));
 
 create table usuario_rol (
     usuario_id bigint not null references usuario(id) on delete cascade,
-    rol_id bigint not null references ron(id) on delete restrict,
+    rol_id bigint not null references rol(id) on delete restrict,
     asignado_en timestamptz not null default now(),
     asignado_por bigint references usuario(id) on delete set null,
     primary key (usuario_id, rol_id)

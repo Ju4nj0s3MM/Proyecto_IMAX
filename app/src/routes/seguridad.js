@@ -15,7 +15,11 @@ router.post('/login', wrap(async (req, res) => {
   const { email, password, rol } = req.body;
   if (process.env.AUTH_DEV_BYPASS === 'true' && rol) {
     if (!ROLES.includes(rol)) return res.status(400).json({ error: 'Rol inválido' });
-    req.session.user = { id: rol === 'cliente' ? 100 : 1, nombre: `Dev (${rol})`, roles: [rol] };
+    // Usa un usuario REAL con ese rol (seed demo) para que las FK a usuario funcionen; si no hay, cae al id ficticio.
+    const repo = isMock() ? require('../repos/seguridad-mock') : require('../repos/seguridad-sql');
+    const u = await repo.usuarioDemoPorRol(rol).catch(() => null);
+    req.session.user = u ? { id: Number(u.id), nombre: `${u.nombre} (dev)`, roles: [rol] }
+                         : { id: rol === 'cliente' ? 100 : 1, nombre: `Dev (${rol})`, roles: [rol] };
     return res.json(req.session.user);
   }
   const rows = await call('SELECT * FROM fn_autenticar($1,$2)', [email, password]);
@@ -50,5 +54,8 @@ router.get('/auditoria', requireRole('administrador'), wrap(async (req, res) => 
 }));
 
 // TODO (Brandon, opcional): ejecutar cada request con el rol de PostgreSQL del usuario (SET ROLE rol_x) para que el RBAC también lo aplique la BD.
+
+// Administración de usuarios, roles y usuario_rol (tablas de 01_catalogo.sql). Ver src/routes/seguridad-admin.js
+router.use('/admin', require('./seguridad-admin'));
 
 module.exports = router;
