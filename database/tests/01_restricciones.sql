@@ -84,3 +84,27 @@ select table_name, column_name
 from information_schema.columns
 where table_name in ('pago', 'orden', 'boleto')
   and (column_name like '%cvv%' or column_name like '%numero_tarjeta%');
+
+
+-- Prueba de la bitácora de asientos
+ 
+-- Prueba 1: una fila de octubre cae en la partición de octubre
+-- Resultado esperado: FUNCIONA
+insert into asiento_auditoria_log (funcion_id, asiento_id, estado_nuevo, fecha)
+values (1, 1, 'BLOQUEADO', '2026-10-22 10:00');
+ 
+-- Prueba 2: una fila de noviembre cae en la partición de noviembre
+-- Resultado esperado: FUNCIONA
+insert into asiento_auditoria_log (funcion_id, asiento_id, estado_nuevo, fecha)
+values (1, 1, 'VENDIDO', '2026-11-05 15:30');
+ 
+-- Prueba 3: una fecha sin partición creada (marzo de 2027)
+-- Resultado esperado: ERROR (no partition found for row)
+insert into asiento_auditoria_log (funcion_id, asiento_id, estado_nuevo, fecha)
+values (1, 1, 'BLOQUEADO', '2027-03-01 09:00');
+ 
+-- Prueba 4: ver en qué partición quedó cada fila
+-- Resultado esperado: tableoid = asiento_auditoria_log_2026_10 y asiento_auditoria_log_2026_11
+select tableoid::regclass as particion, estado_nuevo, fecha
+from asiento_auditoria_log
+order by fecha;
