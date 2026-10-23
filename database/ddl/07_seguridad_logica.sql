@@ -89,3 +89,32 @@ begin
     end if;
 end;
 $$;
+
+create or replace function fn_registrar_auditoria(
+    p_usuario_id bigint,
+    p_ip inet,
+    p_accion text,
+    p_tabla text default null,
+    p_registro_id bigint default null,
+    p_motivo text default null,
+    p_detalle jsonb default null
+) returns bigint
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_id bigint;
+begin
+    insert into admin_operacion_audit
+        (usuario_id, rol_id, ip, accion, tabla_afectada, registro_id, motivo, detalle)
+    select p_usuario_id, ur.rol_id, p_ip, p_accion, p_tabla, p_registro_id, p_motivo, p_detalle
+      from usuario_rol ur
+     where ur.usuario_id = p_usuario_id
+     limit 1
+    returning id into v_id;
+
+    return v_id;
+end;
+$$;
+
