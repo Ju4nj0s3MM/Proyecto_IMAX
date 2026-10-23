@@ -130,3 +130,37 @@ values (1, 1, 'BLOQUEO', '2027-04-01 08:00');
 -- Resultado esperado: transaccion_log_2026_10
 select tableoid::regclass as particion, tipo, monto, resultado, fecha
 from transaccion_log;
+
+-- Prueba del bloqueo de UPDATE y DELETE en las bitácoras
+ 
+-- Prueba 1: agregar filas sigue funcionando
+-- Resultado esperado: FUNCIONA
+insert into asiento_auditoria_log (funcion_id, asiento_id, estado_nuevo, fecha)
+values (1, 1, 'BLOQUEADO', '2026-10-22 10:00');
+insert into transaccion_log (orden_id, usuario_id, tipo, fecha)
+values (1, 1, 'BLOQUEO', '2026-10-22 10:00');
+ 
+-- Prueba 2: modificar una fila de la bitácora de asientos
+-- Resultado esperado: ERROR (la bitácora no permite UPDATE)
+update asiento_auditoria_log set estado_nuevo = 'VENDIDO' where asiento_id = 1;
+ 
+-- Prueba 3: borrar una fila de la bitácora de asientos
+-- Resultado esperado: ERROR (la bitácora no permite DELETE)
+delete from asiento_auditoria_log where asiento_id = 1;
+ 
+-- Prueba 4: modificar una fila de la bitácora de transacciones
+-- Resultado esperado: ERROR
+update transaccion_log set tipo = 'PAGO' where orden_id = 1;
+ 
+-- Prueba 5: borrar una fila de la bitácora de transacciones
+-- Resultado esperado: ERROR
+delete from transaccion_log where orden_id = 1;
+ 
+-- Prueba 6: intentar saltarse el bloqueo escribiendo directo en la partición
+-- Resultado esperado: ERROR
+delete from asiento_auditoria_log_2026_10;
+ 
+-- Prueba 7: las filas siguen intactas
+-- Resultado esperado: 1 y 1
+select (select count(*) from asiento_auditoria_log) as asientos,
+       (select count(*) from transaccion_log) as transacciones;

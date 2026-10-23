@@ -42,3 +42,19 @@ create table transaccion_log_2026_11 partition of transaccion_log
     for values from ('2026-11-01') to ('2026-12-01');
 create table transaccion_log_2026_12 partition of transaccion_log
     for values from ('2026-12-01') to ('2027-01-01');
+
+
+-- Las bitácoras solo se pueden agregar, no se modifican ni se borran
+create function fn_bloquear_cambios_bitacora() returns trigger
+language plpgsql as $$
+begin
+    raise exception 'La bitácora % no permite % (solo INSERT)', tg_table_name, tg_op;
+end $$;
+ 
+create trigger trg_asiento_auditoria_log_solo_insert
+    before update or delete on asiento_auditoria_log
+    for each row execute function fn_bloquear_cambios_bitacora();
+ 
+create trigger trg_transaccion_log_solo_insert
+    before update or delete on transaccion_log
+    for each row execute function fn_bloquear_cambios_bitacora();
