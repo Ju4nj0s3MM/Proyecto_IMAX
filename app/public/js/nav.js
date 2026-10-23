@@ -19,6 +19,7 @@
     { href: '/seguridad/checkin.html', txt: 'Check-in', roles: ['operador_sala', 'administrador'] },
     { href: '/dashboard.html', txt: 'Dashboard', roles: ['contador', 'administrador'] },
     { href: '/catalogo/admin.html', txt: 'Admin catálogo', roles: ['administrador'] },
+    { href: '/seguridad/usuarios.html', txt: 'Usuarios', roles: ['administrador'] },
     { href: '/seguridad/auditoria.html', txt: 'Auditoría', roles: ['administrador'] }
   ];
   const visibles = menu.filter(m => m.roles.includes('*') || (me && me.roles.some(r => m.roles.includes(r))));

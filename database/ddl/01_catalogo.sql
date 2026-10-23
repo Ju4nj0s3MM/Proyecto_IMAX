@@ -5,6 +5,7 @@
 --                  =============================================================
 
 create extension if not exists btree_gist; 
+create extension if not exists pgcrypto;   -- crypt()/gen_salt() para guardar password_hash (bcrypt) dentro de la BD
 
 
 -- --------------
@@ -181,5 +182,39 @@ create table promocion (
     constraint ck_promocion_fechas check (fecha_hasta is null or fecha_desde is null or fecha_hasta >= fecha_desde),
     constraint ck_promocion_condicion check (dia_semana is not null or requiere_cantidad_par)
 ); 
+
+-- ----------------------
+-- usuarios y roles 
+-- ---------------------- 
+
+create table rol (
+    id bigint generated always as identity primary key,
+    nombre varchar(50) not null unique,
+    descripcion varchar(200)
+);
+
+create table usuario (
+    id bigint generated always as identity primary key,
+    nombre varchar(100) not null,
+    apellido varchar(100) not null,
+    email varchar(150) not null,
+    password_hash varchar(200) not null,
+    telefono varchar(20),
+    activo boolean not null default true,
+    creado_en timestamptz not null default now(),
+    constraint ck_usuario_email check (email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$')
+);
+
+create unique index uq_usuario_email on usuario(lower(email)); 
+
+create table usuario_rol (
+    usuario_id bigint not null references usuario(id) on delete cascade,
+    rol_id bigint not null references rol(id) on delete restrict,
+    asignado_en timestamptz not null default now(),
+    asignado_por bigint references usuario(id) on delete set null,
+    primary key (usuario_id, rol_id)
+); 
+
+
 
 
