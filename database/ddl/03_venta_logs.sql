@@ -21,3 +21,24 @@ create table asiento_auditoria_log_2026_11 partition of asiento_auditoria_log
     for values from ('2026-11-01') to ('2026-12-01');
 create table asiento_auditoria_log_2026_12 partition of asiento_auditoria_log
     for values from ('2026-12-01') to ('2027-01-01');
+
+    -- Registra cada operación de dinero o de compra (bloqueo, pago, boleto, etc.)
+create table transaccion_log (
+    id bigserial,
+    orden_id bigint,
+    usuario_id bigint,
+    tipo varchar(30) not null,
+    monto numeric(12,2),
+    resultado varchar(20),
+    detalle varchar(200),
+    fecha timestamptz not null default now(),
+    primary key (id, fecha),
+    check (tipo in ('BLOQUEO', 'PAGO', 'LIBERACION', 'EXPIRACION', 'EMISION_BOLETO', 'REEMBOLSO'))
+) partition by range (fecha);
+ 
+create table transaccion_log_2026_10 partition of transaccion_log
+    for values from ('2026-10-01') to ('2026-11-01');
+create table transaccion_log_2026_11 partition of transaccion_log
+    for values from ('2026-11-01') to ('2026-12-01');
+create table transaccion_log_2026_12 partition of transaccion_log
+    for values from ('2026-12-01') to ('2027-01-01');

@@ -108,3 +108,25 @@ values (1, 1, 'BLOQUEADO', '2027-03-01 09:00');
 select tableoid::regclass as particion, estado_nuevo, fecha
 from asiento_auditoria_log
 order by fecha;
+
+-- Prueba de la bitácora de transacciones
+ 
+-- Prueba 1: registrar un pago aprobado
+-- Resultado esperado: FUNCIONA
+insert into transaccion_log (orden_id, usuario_id, tipo, monto, resultado, fecha)
+values (1, 1, 'PAGO', 17.00, 'APROBADO', '2026-10-22 11:00');
+ 
+-- Prueba 2: tipo de transacción que no existe
+-- Resultado esperado: ERROR (check de tipo)
+insert into transaccion_log (orden_id, usuario_id, tipo, fecha)
+values (1, 1, 'REGALO', '2026-10-22 11:05');
+ 
+-- Prueba 3: fecha sin partición (abril de 2027)
+-- Resultado esperado: ERROR (no partition found for row)
+insert into transaccion_log (orden_id, usuario_id, tipo, fecha)
+values (1, 1, 'BLOQUEO', '2027-04-01 08:00');
+ 
+-- Prueba 4: ver en qué partición quedó la fila
+-- Resultado esperado: transaccion_log_2026_10
+select tableoid::regclass as particion, tipo, monto, resultado, fecha
+from transaccion_log;
