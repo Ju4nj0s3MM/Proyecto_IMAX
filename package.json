@@ -1,8 +1,10 @@
 {
-  "dependencies": {
-    "dotenv": "^18.0.8",
-    "express": "^5.3.0",
-    "express-session": "^1.19.0",
-    "pg": "^8.23.1"
+  "name": "proyecto-imax",
+  "private": true,
+  "description": "Atajos para ejecutar la app desde la raíz del repositorio",
+  "scripts": {
+    "postinstall": "npm --prefix app install",
+    "dev": "npm --prefix app run dev",
+    "start": "npm --prefix app start"
   }
 }

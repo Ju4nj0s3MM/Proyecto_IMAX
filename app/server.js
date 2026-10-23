@@ -1,4 +1,7 @@
 require('dotenv').config();
+// Valores por defecto: sin .env la app arranca en modo MOCK (sin BD). Para usar la BD real: MOCK=false en .env
+process.env.MOCK ??= 'true';
+process.env.AUTH_DEV_BYPASS ??= process.env.MOCK;
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
