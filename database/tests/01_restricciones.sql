@@ -164,3 +164,29 @@ delete from asiento_auditoria_log_2026_10;
 -- Resultado esperado: 1 y 1
 select (select count(*) from asiento_auditoria_log) as asientos,
        (select count(*) from transaccion_log) as transacciones;
+
+-- Prueba de la creación de particiones mensuales
+
+-- Prueba 1: antes de crear la partición, una fecha de marzo de 2027 falla
+-- Resultado esperado: ERROR (no partition found for row)
+insert into transaccion_log (orden_id, usuario_id, tipo, fecha)
+values (1, 1, 'BLOQUEO', '2027-03-10 09:00');
+
+-- Prueba 2: crear las particiones de marzo de 2027
+-- Resultado esperado: FUNCIONA
+select fn_crear_particiones_mes('2027-03-15');
+
+-- Prueba 3: ahora la misma fila entra en la partición de marzo
+-- Resultado esperado: FUNCIONA
+insert into transaccion_log (orden_id, usuario_id, tipo, fecha)
+values (1, 1, 'BLOQUEO', '2027-03-10 09:00');
+
+-- Prueba 4: llamar la función otra vez para el mismo mes no da error
+-- Resultado esperado: FUNCIONA
+select fn_crear_particiones_mes('2027-03-01');
+
+-- Prueba 5: ver las particiones que existen (deben salir las de octubre 2026 a marzo 2027, en las dos bitácoras)
+select inhparent::regclass as bitacora, inhrelid::regclass as particion
+from pg_inherits
+where inhparent in ('asiento_auditoria_log'::regclass, 'transaccion_log'::regclass)
+order by 1, 2;

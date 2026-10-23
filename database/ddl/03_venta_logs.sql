@@ -58,3 +58,20 @@ create trigger trg_asiento_auditoria_log_solo_insert
 create trigger trg_transaccion_log_solo_insert
     before update or delete on transaccion_log
     for each row execute function fn_bloquear_cambios_bitacora();
+
+
+-- Crea la partición del mes de la fecha indicada en las dos bitácoras (si ya existe, no hace nada)
+create function fn_crear_particiones_mes(p_fecha date) returns void
+language plpgsql as $$
+declare
+    v_inicio date := date_trunc('month', p_fecha)::date;
+    v_fin date := (date_trunc('month', p_fecha) + interval '1 month')::date;
+    v_sufijo text := to_char(v_inicio, 'YYYY_MM');
+    v_tabla text;
+begin
+    foreach v_tabla in array array['asiento_auditoria_log', 'transaccion_log'] loop
+        execute format(
+            'create table if not exists %I partition of %I for values from (%L) to (%L)',
+            v_tabla || '_' || v_sufijo, v_tabla, v_inicio, v_fin);
+    end loop;
+end $$;
