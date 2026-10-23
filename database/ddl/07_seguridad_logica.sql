@@ -104,14 +104,26 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
+    v_rol_id bigint;
     v_id bigint;
 begin
+    -- Tomar el rol del usuario, con preferencia por administrador
+    select ur.rol_id into v_rol_id
+      from usuario_rol ur
+      join rol r on r.id = ur.rol_id
+     where ur.usuario_id = p_usuario_id
+     order by (r.nombre = 'administrador') desc, ur.asignado_en
+     limit 1;
+
+    if v_rol_id is null then
+        raise exception 'El usuario % no tiene rol asignado', p_usuario_id
+            using errcode = '22023';
+    end if;
+
     insert into admin_operacion_audit
         (usuario_id, rol_id, ip, accion, tabla_afectada, registro_id, motivo, detalle)
-    select p_usuario_id, ur.rol_id, p_ip, p_accion, p_tabla, p_registro_id, p_motivo, p_detalle
-      from usuario_rol ur
-     where ur.usuario_id = p_usuario_id
-     limit 1
+    values
+        (p_usuario_id, v_rol_id, p_ip, p_accion, p_tabla, p_registro_id, p_motivo, p_detalle)
     returning id into v_id;
 
     return v_id;
