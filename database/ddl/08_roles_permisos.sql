@@ -21,3 +21,11 @@ revoke execute on function fn_crear_particion_admin_audit(date) from public;
 
 grant usage on schema public to rol_cliente, rol_taquillero, rol_operador_sala,
     rol_contador, rol_administrador;
+
+-- Lectura de cartelera para cliente, taquillero, operador y contador
+grant select on cine, sala, zona_asiento, asiento, clasificacion, genero, pelicula,
+    pelicula_genero, funcion, tipo_entrada, tarifa, promocion
+    to rol_cliente, rol_taquillero, rol_operador_sala, rol_contador;
+
+-- El operador de sala solo consulta las puertas
+grant select on puerta to rol_operador_sala;
