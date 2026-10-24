@@ -190,3 +190,54 @@ select inhparent::regclass as bitacora, inhrelid::regclass as particion
 from pg_inherits
 where inhparent in ('asiento_auditoria_log'::regclass, 'transaccion_log'::regclass)
 order by 1, 2;
+
+-- Pruebas de fn_liberar_expirados
+-- Se corre sobre una base nueva con los DDL y el seed del catálogo.
+
+-- Datos base: 3 órdenes del usuario 1 para la función 1
+insert into metodo_pago (id, codigo, nombre) values (1, 'TARJETA', 'Tarjeta simulada');
+insert into orden (id, usuario_id, funcion_id) values (1, 1, 1);
+insert into orden (id, usuario_id, funcion_id) values (2, 1, 1);
+insert into orden (id, usuario_id, funcion_id) values (3, 1, 1);
+
+-- Orden 1: asiento 1 con el bloqueo ya vencido (hace 1 minuto)
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (1, 1, 1, 1, now() - interval '1 minute');
+-- Orden 2: asiento 2 con el bloqueo todavía vigente (2 minutos más)
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (2, 2, 1, 2, now() + interval '2 minutes');
+-- Orden 3: asiento 3 ya vendido (con fecha vieja, no se debe tocar)
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, estado, bloqueado_hasta, precio)
+values (3, 3, 1, 3, 'VENDIDO', now() - interval '10 minutes', 8.50);
+
+
+-- Prueba 1: liberar los vencidos
+-- Resultado esperado: 1 (solo el asiento 1)
+select fn_liberar_expirados();
+
+-- Prueba 2: estado de cada reserva
+-- Resultado esperado: 1 = EXPIRADO, 2 = BLOQUEADO, 3 = VENDIDO
+select id, asiento_id, estado from reserva_asiento order by id;
+
+-- Prueba 3: estado de cada orden
+-- Resultado esperado: 1 = EXPIRADA, 2 = PENDIENTE, 3 = PENDIENTE
+select id, estado from orden order by id;
+
+-- Prueba 4: el cambio quedó en las bitácoras
+-- Resultado esperado: 1 fila en asiento_auditoria_log (BLOQUEADO -> EXPIRADO) y 1 en transaccion_log (EXPIRACION)
+select asiento_id, estado_anterior, estado_nuevo from asiento_auditoria_log;
+select orden_id, tipo, resultado from transaccion_log;
+
+-- Prueba 5: el asiento 1 ya se puede bloquear otra vez con otra orden
+-- Resultado esperado: FUNCIONA
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (4, 2, 1, 1, now() + interval '2 minutes');
+
+-- Prueba 6: el asiento 2 (bloqueo vigente) sigue sin poder tomarse
+-- Resultado esperado: ERROR (duplicate key, uq_asiento_activo)
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (5, 1, 1, 2, now() + interval '2 minutes');
+
+-- Prueba 7: volver a correr la función cuando no hay nada vencido
+-- Resultado esperado: 0
+select fn_liberar_expirados();
