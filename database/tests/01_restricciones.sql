@@ -462,3 +462,22 @@ select * from fn_confirmar_pago(3, 2, 'TARJETA_SIMULADA', 'APROBADO');
 -- Resultado esperado: VENDIDO x2, LIBERADO x2 en asientos; PAGO APROBADO, EMISION_BOLETO, PAGO RECHAZADO y LIBERACION en transacciones
 select estado_nuevo, count(*) from asiento_auditoria_log where estado_nuevo in ('VENDIDO', 'LIBERADO') group by estado_nuevo order by 1;
 select tipo, resultado from transaccion_log where tipo in ('PAGO', 'EMISION_BOLETO', 'LIBERACION') order by id;
+
+-- Revisión del seed de venta
+-- Resultado esperado: PAGADA x3, CANCELADA x1, EXPIRADA x1, PENDIENTE x1
+select estado, count(*) from orden group by estado order by estado;
+
+-- Resultado esperado: 6 boletos EMITIDO (2 + 3 + 1) y todos con QR distinto
+select count(*) as boletos, count(distinct codigo_qr) as qr_distintos from boleto where estado = 'EMITIDO';
+
+-- Resultado esperado: APROBADO x3 y RECHAZADO x1
+select resultado, count(*) from pago group by resultado order by resultado;
+
+-- Resultado esperado: asientos 1, 2, 10, 11, 12 VENDIDO; 20, 21, 30, 31 DISPONIBLE; 40 BLOQUEADO
+select asiento_id, estado from fn_mapa_asientos(1)
+where asiento_id in (1, 2, 10, 11, 12, 20, 21, 30, 31, 40) order by asiento_id;
+
+-- Resultado esperado: asiento 50 VENDIDO en la función 2 y DISPONIBLE en la función 1
+select 2 as funcion, estado from fn_mapa_asientos(2) where asiento_id = 50
+union all
+select 1, estado from fn_mapa_asientos(1) where asiento_id = 50;
