@@ -29,3 +29,23 @@ grant select on cine, sala, zona_asiento, asiento, clasificacion, genero, pelicu
 
 -- El operador de sala solo consulta las puertas
 grant select on puerta to rol_operador_sala;
+
+-- Administrador: gestión completa del catálogo y las puertas
+grant select, insert, update, delete on cine, sala, zona_asiento, asiento, clasificacion,
+    genero, pelicula, pelicula_genero, funcion, tipo_entrada, tarifa, promocion, puerta
+    to rol_administrador;
+
+-- Administrador: usuarios y roles, sin acceso al hash de la contraseña
+grant select on rol to rol_administrador;
+grant select, insert, delete on usuario_rol to rol_administrador;
+grant select (id, nombre, apellido, email, telefono, activo, creado_en,
+              intentos_fallidos, bloqueado_hasta, ultimo_login)
+    on usuario to rol_administrador;
+grant update (nombre, apellido, telefono, activo, intentos_fallidos, bloqueado_hasta)
+    on usuario to rol_administrador;
+
+-- Bitácora: el administrador solo la consulta y registra mediante la función
+grant select on admin_operacion_audit to rol_administrador;
+grant execute on function fn_registrar_usuario(text, text, text, text, text) to rol_administrador;
+grant execute on function fn_registrar_auditoria(bigint, inet, text, text, bigint, text, jsonb)
+    to rol_administrador;
