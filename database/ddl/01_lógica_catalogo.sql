@@ -152,4 +152,57 @@ begin
       from calculo c;
 end $$;
 
+-- ----------------------
+-- no cambiar la distribución de una sala con ventas activas
+-- ----------------------
+
+-- true si la sala tiene asientos vendidos o bloqueados (bloqueo vigente) en funciones que no han terminado
+create or replace function fn_sala_tiene_ventas(p_sala_id bigint) returns boolean
+language sql stable as $$
+    select exists (
+        select 1 from reserva_asiento ra
+          join funcion f on f.id = ra.funcion_id
+         where f.sala_id = p_sala_id and f.estado = 'Activa' and f.fin > now()
+           and (ra.estado = 'VENDIDO' or (ra.estado = 'BLOQUEADO' and ra.bloqueado_hasta > now())))
+        or exists (
+        select 1 from boleto b
+          join funcion f on f.id = b.funcion_id
+         where f.sala_id = p_sala_id and f.estado = 'Activa' and f.fin > now()
+           and b.estado = 'EMITIDO');
+$$;
+
+create or replace function trg_asiento_rn18() returns trigger
+language plpgsql as $$
+begin
+    if tg_op in ('UPDATE', 'DELETE') and fn_sala_tiene_ventas(old.sala_id) then
+        raise exception 'RN-18: la sala % tiene entradas vendidas o reservadas para funciones programadas, no se puede modificar su mapa de asientos', old.sala_id;
+    end if;
+    if tg_op in ('INSERT', 'UPDATE') and fn_sala_tiene_ventas(new.sala_id) then
+        raise exception 'RN-18: la sala % tiene entradas vendidas o reservadas para funciones programadas, no se puede modificar su mapa de asientos', new.sala_id;
+    end if;
+    if tg_op = 'DELETE' then
+        return old;
+    end if;
+    return new;
+end $$;
+
+create trigger trg_asiento_rn18
+    before insert or update of sala_id, zona_asiento_id, fila, numero, activo or delete on asiento
+    for each row execute function trg_asiento_rn18();
+
+create or replace function trg_sala_rn18() returns trigger
+language plpgsql as $$
+begin
+    if fn_sala_tiene_ventas(old.id) then
+        raise exception 'RN-18: la sala % tiene entradas vendidas o reservadas para funciones programadas, no se puede modificar ni eliminar', old.id;
+    end if;
+    if tg_op = 'DELETE' then
+        return old;
+    end if;
+    return new;
+end $$;
+
+create trigger trg_sala_rn18
+    before update of cine_id, capacidad, activa or delete on sala
+    for each row execute function trg_sala_rn18();
 
