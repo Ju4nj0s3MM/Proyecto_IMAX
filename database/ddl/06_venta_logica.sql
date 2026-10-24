@@ -127,3 +127,60 @@ begin
 
     return query select v_orden, v_expira;
 end $$;
+
+-- Elige el tipo de entrada de cada asiento bloqueado y calcula los montos de la orden.
+-- Usa fn_calcular_total para precios, 2x1 y cargos, y guarda el resultado en la orden y en cada reserva.
+create function fn_asignar_tipos(p_orden_id bigint, p_usuario_id bigint, p_asientos bigint[], p_tipos bigint[])
+returns table (subtotal numeric, descuento numeric, cargo_servicio numeric, total numeric, detalle jsonb)
+language plpgsql as $$
+declare
+    v_orden orden%rowtype;
+    v_calculo record;
+begin
+    select * into v_orden from orden where id = p_orden_id for update;
+    if not found or v_orden.usuario_id <> p_usuario_id then
+        raise exception 'La orden no existe o no le pertenece';
+    end if;
+    if v_orden.estado <> 'PENDIENTE' then
+        raise exception 'La orden ya no está pendiente (%)', v_orden.estado;
+    end if;
+
+    -- el bloqueo debe seguir vigente
+    if not exists (select 1 from reserva_asiento r
+                   where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO' and r.bloqueado_hasta > now()) then
+        raise exception 'El bloqueo de los asientos ya venció';
+    end if;
+
+    -- los asientos recibidos deben ser exactamente los bloqueados de la orden
+    if cardinality(p_asientos) <> (select count(*) from reserva_asiento r
+                                   where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO')
+       or exists (select 1 from unnest(p_asientos) x
+                  where x not in (select r.asiento_id from reserva_asiento r
+                                  where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO')) then
+        raise exception 'Los asientos no coinciden con los bloqueados de la orden';
+    end if;
+
+    select * into v_calculo from fn_calcular_total(v_orden.funcion_id, p_asientos, p_tipos);
+
+    -- precio, descuento y cargo de cada asiento
+    update reserva_asiento r
+    set tipo_entrada_id = t.tipo_id,
+        precio = (d.linea ->> 'precio')::numeric,
+        descuento = (d.linea ->> 'descuento')::numeric,
+        cargo_servicio = (d.linea ->> 'cargo_servicio')::numeric
+    from unnest(p_asientos, p_tipos) t(asiento_id, tipo_id)
+    join jsonb_array_elements(v_calculo.detalle) d(linea)
+      on (d.linea ->> 'asiento_id')::bigint = t.asiento_id
+    where r.orden_id = p_orden_id and r.asiento_id = t.asiento_id and r.estado = 'BLOQUEADO';
+
+    -- totales de la orden
+    update orden o
+    set subtotal = v_calculo.subtotal,
+        descuento = v_calculo.descuento,
+        cargo_servicio = v_calculo.cargo_servicio,
+        total = v_calculo.total
+    where o.id = p_orden_id;
+
+    return query select v_calculo.subtotal, v_calculo.descuento, v_calculo.cargo_servicio,
+                        v_calculo.total, v_calculo.detalle;
+end $$;

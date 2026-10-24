@@ -343,3 +343,51 @@ select * from fn_bloquear_asientos(2, 1, array[1]);
 -- Resultado esperado: filas de BLOQUEADO y de EXPIRADO para el asiento 1; transacciones de tipo BLOQUEO
 select asiento_id, estado_anterior, estado_nuevo from asiento_auditoria_log where asiento_id = 1 order by id;
 select tipo, resultado, detalle from transaccion_log order by id;
+
+-- Pruebas de fn_asignar_tipos 
+-- Se corre sobre una base nueva con todos los DDL (incluida la lógica de catálogo de Mati) y el seed.
+-- Tipos de entrada: 1 Adulto, 2 Niño, 3 Adulto mayor, 4 Estudiante. Usuarios 1 y 2. Función 1, asientos 1 a 80.
+-- Los precios del seed dependen del día y la hora de la función, por eso se comparan contra fn_calcular_total.
+
+select * from fn_bloquear_asientos(1, 1, array[1, 2]);
+
+-- Prueba 1: elegir tipo Adulto para los dos asientos
+-- Resultado esperado: FUNCIONA, devuelve subtotal, descuento, cargo, total y el detalle por asiento
+select subtotal, descuento, cargo_servicio, total from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+
+-- Prueba 2: la orden guardó los mismos montos que calcula fn_calcular_total
+-- Resultado esperado: coincide = true
+select o.total = c.total and o.subtotal = c.subtotal as coincide
+from orden o, fn_calcular_total(1, array[1, 2], array[1, 1]) c
+where o.id = 1;
+
+-- Prueba 3: cada reserva guardó su tipo de entrada y su precio
+-- Resultado esperado: 2 filas con tipo_entrada_id = 1 y precio mayor que 0
+select asiento_id, tipo_entrada_id, precio, cargo_servicio from reserva_asiento where orden_id = 1 order by asiento_id;
+
+-- Prueba 4: otro usuario intenta asignar tipos a esa orden
+-- Resultado esperado: ERROR (la orden no le pertenece)
+select * from fn_asignar_tipos(1, 2, array[1, 2], array[1, 1]);
+
+-- Prueba 5: asientos que no son los bloqueados
+-- Resultado esperado: ERROR (no coinciden con los bloqueados)
+select * from fn_asignar_tipos(1, 1, array[1, 3], array[1, 1]);
+
+-- Prueba 6: faltan asientos de la orden
+-- Resultado esperado: ERROR (no coinciden con los bloqueados)
+select * from fn_asignar_tipos(1, 1, array[1], array[1]);
+
+-- Prueba 7: dos entradas de estudiante activan el 2x1 de estudiantes
+-- Resultado esperado: descuento mayor que 0
+select * from fn_bloquear_asientos(2, 1, array[10, 11]);
+select descuento > 0 as hay_descuento_2x1 from fn_asignar_tipos(2, 2, array[10, 11], array[4, 4]);
+
+-- Prueba 8: el bloqueo ya venció
+-- Resultado esperado: ERROR (el bloqueo ya venció)
+update reserva_asiento set bloqueado_hasta = now() - interval '1 minute' where orden_id = 1;
+select * from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+
+-- Prueba 9: la orden ya no está pendiente
+-- Resultado esperado: ERROR (la orden ya no está pendiente)
+update orden set estado = 'CANCELADA' where id = 1;
+select * from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
