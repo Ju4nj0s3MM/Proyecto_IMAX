@@ -20,7 +20,7 @@ router.post('/reservas', requireLogin, wrap(async (req, res) => {
   res.json(rows[0] || {});
 }));
 
-// RN-09, RN-10, RN-11. Contrato: fn_confirmar_pago(reserva, metodo, resultado)  resultado = APROBADO | RECHAZADO (simulado)
+// RN-09, RN-10, RN-11. fn_confirmar_pago(orden, usuario, metodo, resultado)  resultado = APROBADO | RECHAZADO (simulado)
 router.post('/pagos', requireLogin, wrap(async (req, res) => {
   // RN-09: jamás aceptar datos de tarjeta
   const prohibidos = ['numero_tarjeta', 'tarjeta', 'cvv', 'cvc', 'card_number'];
@@ -30,7 +30,15 @@ router.post('/pagos', requireLogin, wrap(async (req, res) => {
   const { reserva_id, metodo = 'TARJETA_SIMULADA', resultado } = req.body;
   if (!['APROBADO', 'RECHAZADO'].includes(resultado)) return res.status(400).json({ error: 'resultado debe ser APROBADO o RECHAZADO' });
   if (isMock()) return res.json(mock.pago({ resultado }));
-  res.json(await call('SELECT * FROM fn_confirmar_pago($1,$2,$3)', [reserva_id, metodo, resultado]));
+  // el usuario sale de la sesión, nunca del body
+  const rows = await call('SELECT * FROM fn_confirmar_pago($1,$2,$3,$4)',
+    [reserva_id, req.session.user.id, metodo, resultado]);
+  // la función devuelve una fila por boleto; se agrupan para que quede igual que el mock
+  res.json({
+    resultado: rows[0].resultado_pago,
+    mensaje: rows[0].mensaje,
+    boletos: rows.filter(r => r.boleto_id).map(r => ({ boleto_id: r.boleto_id, codigo_qr: r.codigo_qr }))
+  });
 }));
 
 // RN-13. Contrato: fn_mis_boletos(usuario)
