@@ -190,3 +190,156 @@ select inhparent::regclass as bitacora, inhrelid::regclass as particion
 from pg_inherits
 where inhparent in ('asiento_auditoria_log'::regclass, 'transaccion_log'::regclass)
 order by 1, 2;
+
+-- Pruebas de fn_liberar_expirados
+-- Se corre sobre una base nueva con los DDL y el seed del catálogo.
+
+-- Datos base: 3 órdenes del usuario 1 para la función 1
+insert into metodo_pago (id, codigo, nombre) values (1, 'TARJETA', 'Tarjeta simulada');
+insert into orden (id, usuario_id, funcion_id) values (1, 1, 1);
+insert into orden (id, usuario_id, funcion_id) values (2, 1, 1);
+insert into orden (id, usuario_id, funcion_id) values (3, 1, 1);
+
+-- Orden 1: asiento 1 con el bloqueo ya vencido (hace 1 minuto)
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (1, 1, 1, 1, now() - interval '1 minute');
+-- Orden 2: asiento 2 con el bloqueo todavía vigente (2 minutos más)
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (2, 2, 1, 2, now() + interval '2 minutes');
+-- Orden 3: asiento 3 ya vendido (con fecha vieja, no se debe tocar)
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, estado, bloqueado_hasta, precio)
+values (3, 3, 1, 3, 'VENDIDO', now() - interval '10 minutes', 8.50);
+
+
+-- Prueba 1: liberar los vencidos
+-- Resultado esperado: 1 (solo el asiento 1)
+select fn_liberar_expirados();
+
+-- Prueba 2: estado de cada reserva
+-- Resultado esperado: 1 = EXPIRADO, 2 = BLOQUEADO, 3 = VENDIDO
+select id, asiento_id, estado from reserva_asiento order by id;
+
+-- Prueba 3: estado de cada orden
+-- Resultado esperado: 1 = EXPIRADA, 2 = PENDIENTE, 3 = PENDIENTE
+select id, estado from orden order by id;
+
+-- Prueba 4: el cambio quedó en las bitácoras
+-- Resultado esperado: 1 fila en asiento_auditoria_log (BLOQUEADO -> EXPIRADO) y 1 en transaccion_log (EXPIRACION)
+select asiento_id, estado_anterior, estado_nuevo from asiento_auditoria_log;
+select orden_id, tipo, resultado from transaccion_log;
+
+-- Prueba 5: el asiento 1 ya se puede bloquear otra vez con otra orden
+-- Resultado esperado: FUNCIONA
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (4, 2, 1, 1, now() + interval '2 minutes');
+
+-- Prueba 6: el asiento 2 (bloqueo vigente) sigue sin poder tomarse
+-- Resultado esperado: ERROR (duplicate key, uq_asiento_activo)
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (5, 1, 1, 2, now() + interval '2 minutes');
+
+-- Prueba 7: volver a correr la función cuando no hay nada vencido
+-- Resultado esperado: 0
+select fn_liberar_expirados();
+
+-- Pruebas de fn_mapa_asientos 
+-- Se corre sobre una base nueva con los DDL y el seed del catálogo.
+-- La función 1 es de la sala "Sala 1 IMAX Laser" (80 asientos, filas A a H).
+
+insert into orden (id, usuario_id, funcion_id) values (1, 1, 1);
+insert into orden (id, usuario_id, funcion_id) values (2, 1, 1);
+insert into orden (id, usuario_id, funcion_id) values (3, 1, 1);
+
+-- Prueba 1: función sin ventas, todos los asientos disponibles
+-- Resultado esperado: 80 asientos, todos DISPONIBLE
+select estado, count(*) from fn_mapa_asientos(1) group by estado;
+
+-- Asiento 1 bloqueado, asiento 2 vendido, asiento 3 con bloqueo vencido
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (1, 1, 1, 1, now() + interval '2 minutes');
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, estado, bloqueado_hasta, precio)
+values (2, 2, 1, 2, 'VENDIDO', now() - interval '10 minutes', 8.50);
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (3, 3, 1, 3, now() - interval '1 minute');
+
+-- Prueba 2: estado de los 3 primeros asientos
+-- Resultado esperado: asiento 1 (A1) BLOQUEADO, asiento 2 (B1) VENDIDO, asiento 3 (C1) DISPONIBLE (el bloqueo ya venció)
+select asiento_id, fila, numero, zona, estado
+from fn_mapa_asientos(1) where asiento_id in (1, 2, 3) order by asiento_id;
+
+-- Prueba 3: conteo por estado
+-- Resultado esperado: BLOQUEADO 1, VENDIDO 1, DISPONIBLE 78
+select estado, count(*) from fn_mapa_asientos(1) group by estado order by estado;
+
+-- Prueba 4: un asiento desactivado ya no aparece en el mapa
+-- Resultado esperado: 79 asientos
+update asiento set activo = false where id = 80;
+select count(*) from fn_mapa_asientos(1);
+
+-- Prueba 5: función que no existe
+-- Resultado esperado: 0 filas
+select count(*) from fn_mapa_asientos(9999);
+
+-- Prueba 6: las ventas de una función no afectan el mapa de otra de la misma sala
+-- Resultado esperado: función 2 (misma sala), todos los asientos DISPONIBLE
+select f.id as funcion, count(*) filter (where m.estado <> 'DISPONIBLE') as ocupados
+from funcion f, lateral fn_mapa_asientos(f.id) m
+where f.id = 2 and f.sala_id = (select sala_id from funcion where id = 1)
+group by f.id;
+
+-- Pruebas de fn_bloquear_asientos 
+-- Se corre sobre una base nueva con los DDL y el seed del catálogo.
+-- Función 1: sala "Sala 1 IMAX Laser" (asientos 1 a 80). Usuarios 1 y 2. Función 5: otra sala (asientos desde el 81).
+
+-- Prueba 1: el usuario 1 bloquea los asientos 1 y 2
+-- Resultado esperado: FUNCIONA, devuelve el reserva_id y una hora de vencimiento unos 2 minutos adelante
+select * from fn_bloquear_asientos(1, 1, array[1, 2]);
+
+-- Prueba 2: la orden y las reservas quedaron creadas
+-- Resultado esperado: orden 1 PENDIENTE; asientos 1 y 2 BLOQUEADO
+select id, usuario_id, estado from orden;
+select orden_id, asiento_id, estado from reserva_asiento order by asiento_id;
+
+-- Prueba 3: el mapa ya muestra esos asientos como bloqueados
+-- Resultado esperado: BLOQUEADO 2
+select estado, count(*) from fn_mapa_asientos(1) where estado = 'BLOQUEADO' group by estado;
+
+-- Prueba 4: el usuario 2 intenta bloquear el asiento 2 (ya bloqueado) junto con el 3
+-- Resultado esperado: ERROR (Asiento no disponible)
+select * from fn_bloquear_asientos(2, 1, array[3, 2]);
+
+-- Prueba 5: no quedó nada a medias (el asiento 3 no se bloqueó y no se creó una orden)
+-- Resultado esperado: 1 orden y 2 reservas
+select (select count(*) from orden) as ordenes, (select count(*) from reserva_asiento) as reservas;
+
+-- Prueba 6: más de 6 asientos
+-- Resultado esperado: ERROR (Máximo 6 asientos por compra)
+select * from fn_bloquear_asientos(2, 1, array[10, 11, 12, 13, 14, 15, 16]);
+
+-- Prueba 7: exactamente 6 asientos
+-- Resultado esperado: FUNCIONA
+select * from fn_bloquear_asientos(2, 1, array[10, 11, 12, 13, 14, 15]);
+
+-- Prueba 8: lista vacía y asientos repetidos
+-- Resultado esperado: ERROR en los dos
+select * from fn_bloquear_asientos(2, 1, array[]::bigint[]);
+select * from fn_bloquear_asientos(2, 1, array[20, 20]);
+
+-- Prueba 9: un asiento de otra sala (el 81 es de la sala de la función 5)
+-- Resultado esperado: ERROR (no pertenece a la sala)
+select * from fn_bloquear_asientos(2, 1, array[81]);
+
+-- Prueba 10: función cancelada
+-- Resultado esperado: ERROR (la función no está disponible)
+update funcion set estado = 'Cancelada' where id = 2;
+select * from fn_bloquear_asientos(2, 2, array[1]);
+
+-- Prueba 11: el bloqueo del asiento 1 vence y otro usuario puede tomarlo
+-- Resultado esperado: FUNCIONA
+update reserva_asiento set bloqueado_hasta = now() - interval '1 minute' where asiento_id = 1;
+select * from fn_bloquear_asientos(2, 1, array[1]);
+
+-- Prueba 12: quedó registro en las bitácoras
+-- Resultado esperado: filas de BLOQUEADO y de EXPIRADO para el asiento 1; transacciones de tipo BLOQUEO
+select asiento_id, estado_anterior, estado_nuevo from asiento_auditoria_log where asiento_id = 1 order by id;
+select tipo, resultado, detalle from transaccion_log order by id;
