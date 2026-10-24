@@ -186,3 +186,84 @@ begin
     return query select v_motivo is null, coalesce(v_motivo, 'Ingreso permitido')::text;
 end;
 $$;
+
+create or replace function fn_reembolsar(
+    p_boleto_id bigint,
+    p_admin_id bigint,
+    p_motivo text,
+    p_ip inet default null
+) returns table (ok boolean, mensaje text)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_limite constant interval := interval '2 hours';
+    v_boleto boleto%rowtype;
+    v_reserva reserva_asiento%rowtype;
+    v_inicio timestamptz;
+    v_monto numeric(12,2);
+    v_forzado boolean;
+begin
+    if not exists (select 1 from usuario_rol ur join rol r on r.id = ur.rol_id
+                    where ur.usuario_id = p_admin_id and r.nombre = 'administrador') then
+        return query select false, 'Solo un administrador puede reembolsar'::text;
+        return;
+    end if;
+
+    if p_motivo is null or length(btrim(p_motivo)) < 5 then
+        return query select false, 'Indique el motivo del reembolso (mínimo 5 caracteres)'::text;
+        return;
+    end if;
+
+    select * into v_boleto from boleto where id = p_boleto_id for update;
+    if not found then
+        return query select false, 'Boleto inexistente'::text;
+        return;
+    end if;
+    if v_boleto.estado = 'USADO' then
+        return query select false, 'La entrada ya fue utilizada, no se puede reembolsar'::text;
+        return;
+    end if;
+    if v_boleto.estado = 'ANULADO' then
+        return query select false, 'La entrada ya está anulada'::text;
+        return;
+    end if;
+
+    select inicio into v_inicio from funcion where id = v_boleto.funcion_id;
+    select * into v_reserva from reserva_asiento where id = v_boleto.reserva_asiento_id;
+
+    -- Fuera de la política (hasta 2 horas antes) el reembolso es forzado y queda marcado
+    v_forzado := now() > v_inicio - v_limite;
+    v_monto := coalesce(v_reserva.precio, 0) - v_reserva.descuento + coalesce(v_reserva.cargo_servicio, 0);
+
+    perform fn_crear_particiones_mes(current_date);
+
+    -- Anular el boleto y liberar el asiento para una nueva venta
+    update boleto set estado = 'ANULADO' where id = v_boleto.id;
+    update reserva_asiento set estado = 'LIBERADO' where id = v_reserva.id;
+
+    insert into asiento_auditoria_log (funcion_id, asiento_id, orden_id, usuario_id, estado_anterior, estado_nuevo)
+    values (v_boleto.funcion_id, v_boleto.asiento_id, v_boleto.orden_id, p_admin_id, 'VENDIDO', 'LIBERADO');
+
+    insert into reembolso (boleto_id, orden_id, admin_id, monto, forzado, motivo)
+    values (v_boleto.id, v_boleto.orden_id, p_admin_id, v_monto, v_forzado, left(btrim(p_motivo), 300));
+
+    insert into transaccion_log (orden_id, usuario_id, tipo, monto, resultado, detalle)
+    values (v_boleto.orden_id, p_admin_id, 'REEMBOLSO', v_monto, 'OK', left(btrim(p_motivo), 200));
+
+    -- Si todos los boletos de la orden están anulados, la orden queda reembolsada
+    update orden set estado = 'REEMBOLSADA'
+     where id = v_boleto.orden_id
+       and not exists (select 1 from boleto b where b.orden_id = v_boleto.orden_id and b.estado <> 'ANULADO');
+
+    perform fn_registrar_auditoria(
+        p_admin_id,
+        coalesce(p_ip, inet_client_addr(), '0.0.0.0'::inet),
+        case when v_forzado then 'reembolso_forzado' else 'anulacion_venta' end,
+        'boleto', v_boleto.id, left(btrim(p_motivo), 300),
+        jsonb_build_object('monto', v_monto, 'forzado', v_forzado));
+
+    return query select true, ('Reembolso registrado por ' || v_monto)::text;
+end;
+$$;
