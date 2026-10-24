@@ -391,3 +391,74 @@ select * from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
 -- Resultado esperado: ERROR (la orden ya no está pendiente)
 update orden set estado = 'CANCELADA' where id = 1;
 select * from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+
+-- Pruebas de fn_confirmar_pago
+-- Se corre sobre una base nueva con todos los DDL y el seed del catálogo.
+-- Función 1, asientos 1 a 80. Usuarios 1 y 2. Tipo de entrada 1 = Adulto.
+
+insert into metodo_pago (codigo, nombre) values ('TARJETA_SIMULADA', 'Tarjeta simulada');
+
+-- Orden 1: usuario 1 bloquea los asientos 1 y 2 y elige tipo Adulto
+select * from fn_bloquear_asientos(1, 1, array[1, 2]);
+select total from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+
+-- Prueba 1: pago aprobado
+-- Resultado esperado: 2 filas APROBADO, cada una con su boleto y su código QR
+select resultado_pago, boleto_id, codigo_qr from fn_confirmar_pago(1, 1, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 2: estado después del pago
+-- Resultado esperado: orden PAGADA con fecha de pago; reservas VENDIDO; 1 pago APROBADO por el total de la orden
+select estado, pagada_en is not null as tiene_fecha from orden where id = 1;
+select asiento_id, estado from reserva_asiento where orden_id = 1 order by asiento_id;
+select p.resultado, p.monto = o.total as monto_correcto from pago p join orden o on o.id = p.orden_id where o.id = 1;
+
+-- Prueba 3: los códigos QR son distintos entre sí
+-- Resultado esperado: 2 boletos y 2 códigos distintos
+select count(*) as boletos, count(distinct codigo_qr) as codigos_distintos from boleto;
+
+-- Prueba 4: volver a pagar la misma orden
+-- Resultado esperado: ERROR (la orden ya no está pendiente)
+select * from fn_confirmar_pago(1, 1, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Orden 2: usuario 1 bloquea los asientos 10 y 11 y elige tipo Adulto
+select * from fn_bloquear_asientos(1, 1, array[10, 11]);
+select total from fn_asignar_tipos(2, 1, array[10, 11], array[1, 1]);
+
+-- Prueba 5: pago rechazado
+-- Resultado esperado: RECHAZADO, sin boleto ni código QR
+select * from fn_confirmar_pago(2, 1, 'TARJETA_SIMULADA', 'RECHAZADO');
+
+-- Prueba 6: los asientos se liberaron al instante, no se emitió ningún boleto
+-- Resultado esperado: orden CANCELADA; reservas LIBERADO; asientos 10 y 11 DISPONIBLE; sigue habiendo solo 2 boletos
+select estado from orden where id = 2;
+select asiento_id, estado from reserva_asiento where orden_id = 2 order by asiento_id;
+select asiento_id, estado from fn_mapa_asientos(1) where asiento_id in (1, 2, 10, 11) order by asiento_id;
+select count(*) as boletos from boleto;
+
+-- Prueba 7: otro usuario ya puede tomar el asiento 10 apenas se rechazó el pago
+-- Resultado esperado: FUNCIONA
+select * from fn_bloquear_asientos(2, 1, array[10]);
+
+-- Prueba 8: otro usuario intenta pagar una orden ajena (la orden 3 es del usuario 2)
+-- Resultado esperado: ERROR (la orden no le pertenece)
+select * from fn_confirmar_pago(3, 1, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 9: pagar sin haber elegido el tipo de entrada
+-- Resultado esperado: ERROR (primero debe elegir el tipo de entrada)
+select * from fn_confirmar_pago(3, 2, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 10: método de pago que no existe, y resultado inválido
+-- Resultado esperado: ERROR en los dos
+select * from fn_confirmar_pago(3, 2, 'BITCOIN', 'APROBADO');
+select * from fn_confirmar_pago(3, 2, 'TARJETA_SIMULADA', 'TAL_VEZ');
+
+-- Prueba 11: el bloqueo venció antes de pagar
+-- Resultado esperado: ERROR (el bloqueo venció)
+select total from fn_asignar_tipos(3, 2, array[10], array[1]);
+update reserva_asiento set bloqueado_hasta = now() - interval '1 minute' where orden_id = 3;
+select * from fn_confirmar_pago(3, 2, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 12: quedó todo en las bitácoras
+-- Resultado esperado: VENDIDO x2, LIBERADO x2 en asientos; PAGO APROBADO, EMISION_BOLETO, PAGO RECHAZADO y LIBERACION en transacciones
+select estado_nuevo, count(*) from asiento_auditoria_log where estado_nuevo in ('VENDIDO', 'LIBERADO') group by estado_nuevo order by 1;
+select tipo, resultado from transaccion_log where tipo in ('PAGO', 'EMISION_BOLETO', 'LIBERACION') order by id;

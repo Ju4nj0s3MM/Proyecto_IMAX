@@ -184,3 +184,97 @@ begin
     return query select v_calculo.subtotal, v_calculo.descuento, v_calculo.cargo_servicio,
                         v_calculo.total, v_calculo.detalle;
 end $$;
+
+-- Confirma el pago (simulado) de una orden.
+-- APROBADO: asientos VENDIDO, orden PAGADA y se emiten los boletos con su QR único.
+-- RECHAZADO: los asientos se liberan al instante y la orden se cancela.
+-- Es atómica: o se hace todo o no se hace nada.
+create function fn_confirmar_pago(p_orden_id bigint, p_usuario_id bigint, p_metodo varchar, p_resultado varchar)
+returns table (resultado_pago varchar, mensaje varchar, boleto_id bigint, codigo_qr varchar)
+language plpgsql as $$
+declare
+    v_orden orden%rowtype;
+    v_metodo bigint;
+    v_referencia varchar;
+begin
+    if p_resultado not in ('APROBADO', 'RECHAZADO') then
+        raise exception 'El resultado debe ser APROBADO o RECHAZADO';
+    end if;
+
+    select * into v_orden from orden where id = p_orden_id for update;
+    if not found or v_orden.usuario_id <> p_usuario_id then
+        raise exception 'La orden no existe o no le pertenece';
+    end if;
+    if v_orden.estado <> 'PENDIENTE' then
+        raise exception 'La orden ya no está pendiente (%)', v_orden.estado;
+    end if;
+
+    select m.id into v_metodo from metodo_pago m where m.codigo = p_metodo and m.activo;
+    if not found then
+        raise exception 'Método de pago no válido: %', p_metodo;
+    end if;
+
+    -- el bloqueo debe seguir vigente y cada asiento debe tener su tipo de entrada
+    if not exists (select 1 from reserva_asiento r where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO')
+       or exists (select 1 from reserva_asiento r
+                  where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO' and r.bloqueado_hasta <= now()) then
+        raise exception 'El bloqueo de los asientos venció; vuelva a seleccionarlos';
+    end if;
+    if exists (select 1 from reserva_asiento r
+               where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO' and r.precio is null) then
+        raise exception 'Primero debe elegir el tipo de entrada de cada asiento';
+    end if;
+
+    perform fn_crear_particiones_mes(current_date);
+    v_referencia := 'SIM-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12));
+
+    if p_resultado = 'RECHAZADO' then
+        insert into pago (orden_id, metodo_pago_id, monto, resultado, referencia)
+        values (p_orden_id, v_metodo, v_orden.total, 'RECHAZADO', v_referencia);
+
+        -- RN-10: los asientos se liberan de inmediato
+        update reserva_asiento r set estado = 'LIBERADO'
+        where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO';
+        update orden o set estado = 'CANCELADA' where o.id = p_orden_id;
+
+        insert into asiento_auditoria_log (funcion_id, asiento_id, orden_id, usuario_id, estado_anterior, estado_nuevo)
+        select r.funcion_id, r.asiento_id, p_orden_id, p_usuario_id, 'BLOQUEADO', 'LIBERADO'
+        from reserva_asiento r where r.orden_id = p_orden_id and r.estado = 'LIBERADO';
+
+        insert into transaccion_log (orden_id, usuario_id, tipo, monto, resultado, detalle)
+        values (p_orden_id, p_usuario_id, 'PAGO', v_orden.total, 'RECHAZADO', v_referencia),
+               (p_orden_id, p_usuario_id, 'LIBERACION', null, 'OK', 'pago rechazado');
+
+        return query select 'RECHAZADO'::varchar, 'Pago rechazado: los asientos fueron liberados'::varchar,
+                            null::bigint, null::varchar;
+        return;
+    end if;
+
+    -- pago aprobado
+    insert into pago (orden_id, metodo_pago_id, monto, resultado, referencia)
+    values (p_orden_id, v_metodo, v_orden.total, 'APROBADO', v_referencia);
+
+    update reserva_asiento r set estado = 'VENDIDO'
+    where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO';
+    update orden o set estado = 'PAGADA', pagada_en = now() where o.id = p_orden_id;
+
+    -- RN-11 y RN-12: los boletos se emiten solo después del pago aprobado, cada uno con un QR único
+    insert into boleto (orden_id, reserva_asiento_id, funcion_id, asiento_id, codigo_qr)
+    select r.orden_id, r.id, r.funcion_id, r.asiento_id,
+           'IMAX-' || upper(replace(gen_random_uuid()::text, '-', ''))
+    from reserva_asiento r
+    where r.orden_id = p_orden_id and r.estado = 'VENDIDO';
+
+    insert into asiento_auditoria_log (funcion_id, asiento_id, orden_id, usuario_id, estado_anterior, estado_nuevo)
+    select r.funcion_id, r.asiento_id, p_orden_id, p_usuario_id, 'BLOQUEADO', 'VENDIDO'
+    from reserva_asiento r where r.orden_id = p_orden_id and r.estado = 'VENDIDO';
+
+    insert into transaccion_log (orden_id, usuario_id, tipo, monto, resultado, detalle)
+    values (p_orden_id, p_usuario_id, 'PAGO', v_orden.total, 'APROBADO', v_referencia),
+           (p_orden_id, p_usuario_id, 'EMISION_BOLETO', null, 'OK',
+            (select count(*) from boleto b where b.orden_id = p_orden_id) || ' boleto(s)');
+
+    return query select 'APROBADO'::varchar, 'Pago aprobado'::varchar, b.id, b.codigo_qr
+                 from boleto b where b.orden_id = p_orden_id order by b.id;
+end $$;
+
