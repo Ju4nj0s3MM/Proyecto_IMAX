@@ -241,3 +241,48 @@ values (5, 1, 1, 2, now() + interval '2 minutes');
 -- Prueba 7: volver a correr la función cuando no hay nada vencido
 -- Resultado esperado: 0
 select fn_liberar_expirados();
+
+-- Pruebas de fn_mapa_asientos 
+-- Se corre sobre una base nueva con los DDL y el seed del catálogo.
+-- La función 1 es de la sala "Sala 1 IMAX Laser" (80 asientos, filas A a H).
+
+insert into orden (id, usuario_id, funcion_id) values (1, 1, 1);
+insert into orden (id, usuario_id, funcion_id) values (2, 1, 1);
+insert into orden (id, usuario_id, funcion_id) values (3, 1, 1);
+
+-- Prueba 1: función sin ventas, todos los asientos disponibles
+-- Resultado esperado: 80 asientos, todos DISPONIBLE
+select estado, count(*) from fn_mapa_asientos(1) group by estado;
+
+-- Asiento 1 bloqueado, asiento 2 vendido, asiento 3 con bloqueo vencido
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (1, 1, 1, 1, now() + interval '2 minutes');
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, estado, bloqueado_hasta, precio)
+values (2, 2, 1, 2, 'VENDIDO', now() - interval '10 minutes', 8.50);
+insert into reserva_asiento (id, orden_id, funcion_id, asiento_id, bloqueado_hasta)
+values (3, 3, 1, 3, now() - interval '1 minute');
+
+-- Prueba 2: estado de los 3 primeros asientos
+-- Resultado esperado: asiento 1 (A1) BLOQUEADO, asiento 2 (B1) VENDIDO, asiento 3 (C1) DISPONIBLE (el bloqueo ya venció)
+select asiento_id, fila, numero, zona, estado
+from fn_mapa_asientos(1) where asiento_id in (1, 2, 3) order by asiento_id;
+
+-- Prueba 3: conteo por estado
+-- Resultado esperado: BLOQUEADO 1, VENDIDO 1, DISPONIBLE 78
+select estado, count(*) from fn_mapa_asientos(1) group by estado order by estado;
+
+-- Prueba 4: un asiento desactivado ya no aparece en el mapa
+-- Resultado esperado: 79 asientos
+update asiento set activo = false where id = 80;
+select count(*) from fn_mapa_asientos(1);
+
+-- Prueba 5: función que no existe
+-- Resultado esperado: 0 filas
+select count(*) from fn_mapa_asientos(9999);
+
+-- Prueba 6: las ventas de una función no afectan el mapa de otra de la misma sala
+-- Resultado esperado: función 2 (misma sala), todos los asientos DISPONIBLE
+select f.id as funcion, count(*) filter (where m.estado <> 'DISPONIBLE') as ocupados
+from funcion f, lateral fn_mapa_asientos(f.id) m
+where f.id = 2 and f.sala_id = (select sala_id from funcion where id = 1)
+group by f.id;

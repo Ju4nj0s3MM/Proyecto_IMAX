@@ -39,3 +39,27 @@ begin
 
     return v_total;
 end $$;
+
+-- Mapa de la sala de una función: estado de cada asiento (DISPONIBLE, BLOQUEADO o VENDIDO).
+-- Un bloqueo vencido se muestra como DISPONIBLE, aunque todavía no se haya liberado.
+create function fn_mapa_asientos(p_funcion_id bigint)
+returns table (asiento_id bigint, fila varchar, numero integer, zona varchar, estado varchar)
+language sql stable as $$
+    select a.id,
+           a.fila,
+           a.numero,
+           z.nombre,
+           case
+               when r.estado = 'VENDIDO' then 'VENDIDO'
+               when r.estado = 'BLOQUEADO' and r.bloqueado_hasta > now() then 'BLOQUEADO'
+               else 'DISPONIBLE'
+           end::varchar
+    from funcion f
+    join asiento a on a.sala_id = f.sala_id and a.activo
+    join zona_asiento z on z.id = a.zona_asiento_id
+    left join reserva_asiento r on r.funcion_id = f.id
+                               and r.asiento_id = a.id
+                               and r.estado in ('BLOQUEADO', 'VENDIDO')
+    where f.id = p_funcion_id
+    order by a.fila, a.numero;
+$$;
