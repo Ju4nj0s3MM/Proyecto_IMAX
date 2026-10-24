@@ -63,3 +63,67 @@ language sql stable as $$
     where f.id = p_funcion_id
     order by a.fila, a.numero;
 $$;
+
+-- Bloquea asientos de una función por 2 minutos para un usuario.
+-- Crea la orden PENDIENTE y devuelve su id (reserva_id) y la hora en que vence el bloqueo.
+-- Es atómica: si un asiento falla, no queda ninguno bloqueado ni orden creada.
+create function fn_bloquear_asientos(p_usuario_id bigint, p_funcion_id bigint, p_asientos bigint[])
+returns table (reserva_id bigint, expira_en timestamptz)
+language plpgsql as $$
+declare
+    v_max constant integer := 6;            -- máximo de asientos por compra (RN-04)
+    v_cantidad integer;
+    v_validos integer;
+    v_expira timestamptz := now() + interval '2 minutes';
+    v_orden bigint;
+    v_asiento bigint;
+begin
+    if p_asientos is null or cardinality(p_asientos) = 0 then
+        raise exception 'Debe elegir al menos un asiento';
+    end if;
+    if cardinality(p_asientos) > v_max then
+        raise exception 'Máximo % asientos por compra', v_max;
+    end if;
+
+    select count(distinct x) into v_cantidad from unnest(p_asientos) x;
+    if v_cantidad <> cardinality(p_asientos) then
+        raise exception 'Hay asientos repetidos en la selección';
+    end if;
+
+    -- la función debe estar activa y no haber empezado
+    if not exists (select 1 from funcion where id = p_funcion_id and estado = 'Activa' and inicio > now()) then
+        raise exception 'La función no está disponible para la venta';
+    end if;
+
+    -- todos los asientos deben ser de la sala de la función y estar activos
+    select count(*) into v_validos
+    from asiento a join funcion f on f.sala_id = a.sala_id
+    where f.id = p_funcion_id and a.activo and a.id = any(p_asientos);
+    if v_validos <> v_cantidad then
+        raise exception 'Algún asiento no pertenece a la sala de la función';
+    end if;
+
+    -- libera lo vencido antes de intentar bloquear
+    perform fn_liberar_expirados();
+
+    insert into orden (usuario_id, funcion_id) values (p_usuario_id, p_funcion_id)
+    returning id into v_orden;
+
+    begin
+        foreach v_asiento in array p_asientos loop
+            insert into reserva_asiento (orden_id, funcion_id, asiento_id, bloqueado_hasta)
+            values (v_orden, p_funcion_id, v_asiento, v_expira);
+        end loop;
+    exception when unique_violation then
+        -- otro usuario tomó el asiento primero: se deshace todo
+        raise exception 'Asiento no disponible: otro usuario lo tiene bloqueado o comprado';
+    end;
+
+    insert into asiento_auditoria_log (funcion_id, asiento_id, orden_id, usuario_id, estado_anterior, estado_nuevo)
+    select p_funcion_id, x, v_orden, p_usuario_id, null, 'BLOQUEADO' from unnest(p_asientos) x;
+
+    insert into transaccion_log (orden_id, usuario_id, tipo, resultado, detalle)
+    values (v_orden, p_usuario_id, 'BLOQUEO', 'OK', cardinality(p_asientos) || ' asiento(s)');
+
+    return query select v_orden, v_expira;
+end $$;

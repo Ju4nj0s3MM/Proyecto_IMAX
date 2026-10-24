@@ -286,3 +286,60 @@ select f.id as funcion, count(*) filter (where m.estado <> 'DISPONIBLE') as ocup
 from funcion f, lateral fn_mapa_asientos(f.id) m
 where f.id = 2 and f.sala_id = (select sala_id from funcion where id = 1)
 group by f.id;
+
+-- Pruebas de fn_bloquear_asientos 
+-- Se corre sobre una base nueva con los DDL y el seed del catálogo.
+-- Función 1: sala "Sala 1 IMAX Laser" (asientos 1 a 80). Usuarios 1 y 2. Función 5: otra sala (asientos desde el 81).
+
+-- Prueba 1: el usuario 1 bloquea los asientos 1 y 2
+-- Resultado esperado: FUNCIONA, devuelve el reserva_id y una hora de vencimiento unos 2 minutos adelante
+select * from fn_bloquear_asientos(1, 1, array[1, 2]);
+
+-- Prueba 2: la orden y las reservas quedaron creadas
+-- Resultado esperado: orden 1 PENDIENTE; asientos 1 y 2 BLOQUEADO
+select id, usuario_id, estado from orden;
+select orden_id, asiento_id, estado from reserva_asiento order by asiento_id;
+
+-- Prueba 3: el mapa ya muestra esos asientos como bloqueados
+-- Resultado esperado: BLOQUEADO 2
+select estado, count(*) from fn_mapa_asientos(1) where estado = 'BLOQUEADO' group by estado;
+
+-- Prueba 4: el usuario 2 intenta bloquear el asiento 2 (ya bloqueado) junto con el 3
+-- Resultado esperado: ERROR (Asiento no disponible)
+select * from fn_bloquear_asientos(2, 1, array[3, 2]);
+
+-- Prueba 5: no quedó nada a medias (el asiento 3 no se bloqueó y no se creó una orden)
+-- Resultado esperado: 1 orden y 2 reservas
+select (select count(*) from orden) as ordenes, (select count(*) from reserva_asiento) as reservas;
+
+-- Prueba 6: más de 6 asientos
+-- Resultado esperado: ERROR (Máximo 6 asientos por compra)
+select * from fn_bloquear_asientos(2, 1, array[10, 11, 12, 13, 14, 15, 16]);
+
+-- Prueba 7: exactamente 6 asientos
+-- Resultado esperado: FUNCIONA
+select * from fn_bloquear_asientos(2, 1, array[10, 11, 12, 13, 14, 15]);
+
+-- Prueba 8: lista vacía y asientos repetidos
+-- Resultado esperado: ERROR en los dos
+select * from fn_bloquear_asientos(2, 1, array[]::bigint[]);
+select * from fn_bloquear_asientos(2, 1, array[20, 20]);
+
+-- Prueba 9: un asiento de otra sala (el 81 es de la sala de la función 5)
+-- Resultado esperado: ERROR (no pertenece a la sala)
+select * from fn_bloquear_asientos(2, 1, array[81]);
+
+-- Prueba 10: función cancelada
+-- Resultado esperado: ERROR (la función no está disponible)
+update funcion set estado = 'Cancelada' where id = 2;
+select * from fn_bloquear_asientos(2, 2, array[1]);
+
+-- Prueba 11: el bloqueo del asiento 1 vence y otro usuario puede tomarlo
+-- Resultado esperado: FUNCIONA
+update reserva_asiento set bloqueado_hasta = now() - interval '1 minute' where asiento_id = 1;
+select * from fn_bloquear_asientos(2, 1, array[1]);
+
+-- Prueba 12: quedó registro en las bitácoras
+-- Resultado esperado: filas de BLOQUEADO y de EXPIRADO para el asiento 1; transacciones de tipo BLOQUEO
+select asiento_id, estado_anterior, estado_nuevo from asiento_auditoria_log where asiento_id = 1 order by id;
+select tipo, resultado, detalle from transaccion_log order by id;
