@@ -130,3 +130,59 @@ begin
 end;
 $$;
 
+create or replace function fn_validar_entrada(p_codigo_qr text, p_puerta_id bigint)
+returns table (ok boolean, mensaje text)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_antes constant interval := interval '30 minutes';
+    v_despues constant interval := interval '15 minutes';
+    v_puerta puerta%rowtype;
+    v_boleto boleto%rowtype;
+    v_inicio timestamptz;
+    v_estado_funcion varchar;
+    v_sala bigint;
+    v_motivo text;
+begin
+    select * into v_puerta from puerta where id = p_puerta_id and activa;
+    if not found then
+        v_motivo := 'Puerta no válida';
+    else
+        -- Bloquear el boleto para que dos lecturas simultáneas se atiendan en orden
+        select * into v_boleto from boleto where codigo_qr = p_codigo_qr for update;
+        if not found then
+            v_motivo := 'Entrada no reconocida';
+        else
+            select f.inicio, f.estado, f.sala_id into v_inicio, v_estado_funcion, v_sala
+              from funcion f where f.id = v_boleto.funcion_id;
+
+            if v_boleto.estado = 'USADO' then
+                v_motivo := 'Entrada ya utilizada';
+            elsif v_boleto.estado = 'ANULADO' then
+                v_motivo := 'Entrada anulada';
+            elsif v_estado_funcion <> 'Activa' then
+                v_motivo := 'Función cancelada';
+            elsif v_sala <> v_puerta.sala_id then
+                v_motivo := 'Entrada de otra sala';
+            elsif now() < v_inicio - v_antes then
+                v_motivo := 'Ingreso aún no habilitado';
+            elsif now() > v_inicio + v_despues then
+                v_motivo := 'Ingreso cerrado: fuera del tiempo de tolerancia';
+            end if;
+        end if;
+    end if;
+
+    if v_motivo is null then
+        update boleto set estado = 'USADO', usado_en = now() where id = v_boleto.id;
+    end if;
+
+    insert into acceso_puerta_log (boleto_id, codigo_qr, puerta_id, resultado, motivo)
+    values (v_boleto.id, left(coalesce(p_codigo_qr, ''), 64), p_puerta_id,
+            case when v_motivo is null then 'EXITOSO' else 'RECHAZADO' end,
+            coalesce(v_motivo, 'Ingreso permitido'));
+
+    return query select v_motivo is null, coalesce(v_motivo, 'Ingreso permitido')::text;
+end;
+$$;
