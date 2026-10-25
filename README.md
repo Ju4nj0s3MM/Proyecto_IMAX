@@ -130,7 +130,7 @@ El modelo se organiza en tres módulos, cada uno con un responsable de diseño, 
 | **B. Venta y boletos** | reserva de asiento, orden, detalle, pago, método de pago, boleto (QR), `transaccion_log`, `asiento_auditoria_log` |
 | **C. Seguridad y acceso** | usuario, rol, puerta, reembolso, `acceso_puerta_log`, `admin_operacion_audit` |
 
-> Diagrama Entidad-Relación y modelo relacional: [`docs/03-diseno/integrado.md`](docs/03-diseno/integrado.md) (imágenes en [`docs/img/`](docs/img/)).
+> Diagrama Entidad-Relación y modelo relacional: [`docs/03-diseno/integrado.md`](docs/03-diseno/integrado.md) (imágenes en [`docs/imagenes/`](docs/imagenes/)).
 
 ## 6. Reglas de negocio y su garantía en la base de datos
 
@@ -165,62 +165,92 @@ La matriz completa se documenta en [`docs/rbac-matriz.md`](docs/rbac-matriz.md).
 ```
 Proyecto_IMAX/
 ├── README.md
+├── DIVISION-DE-TRABAJO.md    Reparto por módulo y contratos entre módulos
 ├── package.json              Atajos para ejecutar la aplicación
 ├── app/                      Interfaz web de apoyo (Node.js + Express + HTML/JS)
 │   ├── src/                  API y conexión a la base de datos
-│   └── public/               Páginas de catálogo, venta y seguridad
+│   ├── public/               Páginas de catálogo, venta y seguridad
+│   └── scripts/              Prueba de concurrencia (concurrencia.js)
 ├── database/
-│   ├── 01_… a 08_…           Esquemas, lógica, roles y permisos (scripts numerados)
-│   ├── 09_… a 14_…           Datos de prueba y datos masivos
-│   ├── 20_consulta_*.sql     Consultas analíticas
-│   ├── build_schema.sh       Genera schema.sql y seed.sql en un solo script
-│   └── pruebas/              Concurrencia, doble escaneo y planes de ejecución
+│   ├── ddl/                  Esquemas, lógica, roles, permisos e índices (01 a 10) y ddls.sql (todos unidos)
+│   ├── seeds/                Datos de demostración y masivos, y seeds.sql / seeds_masivos.sql
+│   ├── queries/              Consultas analíticas y queries.sql
+│   ├── tests/                Pruebas SQL por módulo y tests.sql (todas, cada grupo en una base nueva)
+│   └── explain/              Planes de ejecución antes y después de los índices
 └── docs/
     ├── 01a … 05              Documento técnico por fase
-    ├── 03-diseno/            Diseño conceptual, lógico y físico
+    ├── 03-diseno/            Diseño integrado y por módulo
     ├── 04-pruebas/           Evidencias de pruebas
-    └── img/                  Diagramas
+    └── imagenes/             Diagramas (DER)
 ```
 
 ## 9. Instalación y ejecución
 
-**Requisitos:** Node.js 18 o superior, PostgreSQL 16 (local o en Docker) y Git.
+**Requisitos:** Node.js 18 o superior, PostgreSQL 16 (con `psql` en el PATH) y Git.
 
-### 9.1 Interfaz web (2 pasos)
+### 9.1 Base de datos
+
+Desde la raíz del repositorio. Cada archivo `ddls.sql`, `seeds.sql`, `queries.sql` y `tests.sql` es la unión de los scripts numerados de su carpeta, en el orden en que deben ejecutarse.
 
 ```bash
-npm install        # instala dependencias y crea el archivo .env
-npm run dev        # inicia el servidor
+psql -U postgres -c "drop database if exists imax"
+psql -U postgres -c "create database imax"
+psql -U postgres -d imax -f database/ddl/ddls.sql         # tablas, funciones, triggers, roles e índices
+psql -U postgres -d imax -f database/seeds/seeds.sql      # datos de demostración
+psql -U postgres -d imax -f database/queries/queries.sql  # consultas analíticas
+psql -U postgres -d postgres -f database/tests/tests.sql  # pruebas (crea y borra sus propias bases)
 ```
 
-Abrir <http://localhost:3000>, ir a **Iniciar sesión** y elegir **"Entrar como rol"**. En este modo la aplicación utiliza datos de ejemplo y no requiere base de datos.
+Para los planes de ejecución, que usan datos masivos y tardan varios minutos: `database/seeds/seeds_masivos.sql` y luego `database/explain/explain.sql`.
+
+En Windows (PowerShell), antes de correr `psql`:
+
+```powershell
+chcp 65001
+$env:PGCLIENTENCODING = "UTF8"
+$env:PGPASSWORD = "su_clave"
+```
+
+### 9.2 Interfaz web
+
+```bash
+cd app
+npm install        # instala dependencias y crea el archivo .env
+```
+
+Con la base cargada, editar `app/.env`: `MOCK=false`, `AUTH_DEV_BYPASS=false` y las variables `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` y `PGDATABASE=imax`. Luego:
+
+```bash
+npm run dev        # inicia el servidor en http://localhost:3000
+```
+
+La terminal debe indicar `MOCK=false`. Usuarios de demostración (contraseña `Imax2026!`): `cliente@imax.test`, `taquilla@imax.test`, `operador@imax.test`, `contador@imax.test` y `admin@imax.test`.
+
+Sin base de datos, con `MOCK=true`, la aplicación responde datos de ejemplo y permite **"Entrar como rol"** en la pantalla de inicio de sesión.
 
 > En PowerShell, si aparece el error de ejecución de scripts, ejecutar una vez `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` o utilizar `npm.cmd`.
 
-### 9.2 Base de datos
+### 9.3 Prueba de concurrencia
+
+Con la base cargada y el `.env` configurado, desde `app/`:
 
 ```bash
-# 1. PostgreSQL (ejemplo con Docker)
-docker run --name imax-db -e POSTGRES_PASSWORD=imax -e POSTGRES_DB=imax -p 5432:5432 -d postgres:16
-
-# 2. Generar los scripts unificados
-cd database && ./build_schema.sh
-
-# 3. Crear el esquema y cargar los datos
-psql -h localhost -U postgres -d imax -v ON_ERROR_STOP=1 -f schema.sql -f seed.sql
+node scripts/concurrencia.js 30
 ```
 
-En Windows, `build_schema.sh` se ejecuta desde Git Bash. Para conectar la aplicación a la base real, establecer `MOCK=false` y las variables `PG*` en `app/.env`.
+Lanza 30 clientes que bloquean el mismo asiento a la vez y 10 pagos simultáneos de la misma orden. Debe terminar en `RESULTADO: FUNCIONA (sin doble venta)`.
 
 ## 10. Pruebas y evidencias
 
 | Prueba | Criterio de aceptación | Evidencia |
 |---|---|---|
-| **Concurrencia (doble venta)** | Entre 20 y 50 solicitudes simultáneas sobre el mismo asiento: exactamente una exitosa | [`docs/04-pruebas/venta.md`](docs/04-pruebas/venta.md) |
-| **Doble escaneo de QR** | Entre múltiples lecturas simultáneas, una sola válida; el resto "Entrada ya utilizada" | [`docs/04-pruebas/seguridad.md`](docs/04-pruebas/seguridad.md) |
-| **Rendimiento de consultas** | `EXPLAIN ANALYZE` antes y después de crear índices: de *Seq Scan* a *Index Scan* | [`docs/04-pruebas/`](docs/04-pruebas/) |
-| **Consultas analíticas** | Ocupación y recaudación, top 5 semanal, métodos de pago y auditoría, sin errores | [`database/`](database/) |
-| **RBAC** | Roles sin privilegio no pueden modificar salas ni precios | [`docs/rbac-matriz.md`](docs/rbac-matriz.md) |
+| **Concurrencia (doble venta)** | Entre 20 y 50 solicitudes simultáneas sobre el mismo asiento: exactamente una exitosa | [`docs/04-pruebas/venta.md`](docs/04-pruebas/venta.md), `app/scripts/concurrencia.js` |
+| **Pruebas de venta** | Bloqueo, pago aprobado y rechazado, boletos con QR único, expiración | [`docs/04-pruebas/venta.md`](docs/04-pruebas/venta.md), `database/tests/01_restricciones.sql` |
+| **Pruebas de catálogo** | Programación sin traslapes, cartelera, total con 2x1, RN-18 | [`docs/04-pruebas/catalogo.md`](docs/04-pruebas/catalogo.md), `database/tests/05_catalogo_logica.sql` |
+| **Doble escaneo de QR y reembolsos** | Entre múltiples lecturas simultáneas, una sola válida; el resto "Entrada ya utilizada" | `database/tests/07_checkin_reembolso.sql`, `database/tests/doble_escaneo.py` |
+| **Rendimiento de consultas** | `EXPLAIN ANALYZE` antes y después de crear índices: de *Seq Scan* a *Index Scan* | [`docs/04-pruebas/venta.md`](docs/04-pruebas/venta.md), [`database/explain/`](database/explain/) |
+| **Consultas analíticas** | Ocupación y recaudación, top 5 semanal, métodos de pago y auditoría, sin errores | [`database/queries/`](database/queries/) |
+| **RBAC** | Roles sin privilegio no pueden modificar salas ni precios | [`docs/rbac-matriz.md`](docs/rbac-matriz.md), `database/tests/08_permisos_por_rol.sql` |
 
 ## 11. Metodología de trabajo
 
@@ -228,7 +258,7 @@ En Windows, `build_schema.sh` se ejecuta desde Git Bash. Para conectar la aplica
 - **Commits** siguiendo [Conventional Commits](https://www.conventionalcommits.org/es/): `feat(db):`, `docs:`, `fix(app):`, `test:`.
 - **Scripts SQL numerados**, ejecutables en orden sobre una base de datos vacía.
 - **Seguimiento:** reuniones breves dos veces por semana y entregables por hito.
-- Detalle del reparto y de los contratos entre módulos: [`docs/DIVISION-DE-TRABAJO.md`](docs/DIVISION-DE-TRABAJO.md) y [`docs/00-acuerdos-compartidos.md`](docs/00-acuerdos-compartidos.md).
+- Detalle del reparto y de los contratos entre módulos: [`DIVISION-DE-TRABAJO.md`](DIVISION-DE-TRABAJO.md).
 
 ## 12. Equipo
 
@@ -242,26 +272,29 @@ En Windows, `build_schema.sh` se ejecuta desde Git Bash. Para conectar la aplica
 
 | Documento | Descripción |
 |---|---|
-| [`docs/DIVISION-DE-TRABAJO.md`](docs/DIVISION-DE-TRABAJO.md) | Contexto completo, reglas de negocio y reparto por módulo |
-| [`docs/00-acuerdos-compartidos.md`](docs/00-acuerdos-compartidos.md) | Convenciones, tablas compartidas y valores de estado |
+| [`DIVISION-DE-TRABAJO.md`](DIVISION-DE-TRABAJO.md) | Contexto completo, reglas de negocio y reparto por módulo |
 | [`docs/01a-factibilidad-tecnica-riesgos.md`](docs/01a-factibilidad-tecnica-riesgos.md) | Dictamen de rechazo y matriz de riesgos |
 | [`docs/01b-factibilidad-economica.md`](docs/01b-factibilidad-economica.md) | Comparativa cloud, CAPEX/OPEX a 3 años y ROI |
 | [`docs/01c-almacenamiento.md`](docs/01c-almacenamiento.md) | Dimensionamiento de almacenamiento a 5 años |
 | [`docs/02-requisitos.md`](docs/02-requisitos.md) | Requisitos y volúmenes |
-| [`docs/03-diseno/`](docs/03-diseno/) | Diseño conceptual, lógico y físico |
-| [`docs/04-pruebas/`](docs/04-pruebas/) | Pruebas de concurrencia y rendimiento |
+| [`docs/03-diseno/integrado.md`](docs/03-diseno/integrado.md) | Diseño integrado: DER global, modelo relacional y decisiones entre módulos |
+| [`docs/03-diseno/modulo-catalogo.md`](docs/03-diseno/modulo-catalogo.md) | Módulo A: catálogo, programación y tarifas |
+| [`docs/03-diseno/modulo-venta.md`](docs/03-diseno/modulo-venta.md) | Módulo B: venta, bloqueo de asientos y pago |
+| [`docs/03-diseno/wireframes.md`](docs/03-diseno/wireframes.md) | Bocetos de las pantallas |
+| [`docs/04-pruebas/catalogo.md`](docs/04-pruebas/catalogo.md) y [`venta.md`](docs/04-pruebas/venta.md) | Pruebas y evidencias por módulo |
 | [`docs/05-operacion.md`](docs/05-operacion.md) | Respaldos, recuperación ante desastres y SLA |
+| [`docs/rbac-matriz.md`](docs/rbac-matriz.md) | Matriz de roles y permisos |
 | [`app/README.md`](app/README.md) | Guía de la interfaz web y contrato con la base de datos |
 
 ## 14. Estado del proyecto
 
 - [x] Estructura del repositorio y metodología de trabajo
-- [x] Base de la interfaz web (modo simulado)
-- [ ] Fase 1 — Análisis de factibilidad
-- [ ] Fase 2 — Requisitos y dimensionamiento
-- [ ] Fase 3 — Diseño conceptual, lógico y físico
-- [ ] Fase 4 — Implementación y pruebas
-- [ ] Fase 5 — Operación y mantenimiento
+- [x] Interfaz web conectada a la base de datos (catálogo, venta y seguridad)
+- [x] Fase 1 — Análisis de factibilidad
+- [x] Fase 2 — Requisitos y dimensionamiento
+- [x] Fase 3 — Diseño conceptual, lógico y físico
+- [x] Fase 4 — Implementación y pruebas (concurrencia y EXPLAIN ANALYZE incluidos)
+- [x] Fase 5 — Operación y mantenimiento
 - [ ] Documento técnico final y video de demostración
 
 ## 15. Referencias
