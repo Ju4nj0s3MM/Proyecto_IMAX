@@ -1,14 +1,9 @@
 \set ON_ERROR_STOP off
 begin;
 
--- Datos de prueba: puertas, asientos y funciones respecto a la hora actual
+-- Datos de prueba: puertas y funciones respecto a la hora actual
 insert into puerta (sala_id, nombre)
 select id, 'Tótem 1' from sala where nombre in ('Sala 1', 'Sala 2', 'Sala Premium');
-
-insert into asiento (sala_id, zona_asiento_id, fila, numero)
-select s.id, (select id from zona_asiento where nombre = 'General'), 'A', n
-  from sala s, generate_series(1, 6) n
- where s.nombre = 'Sala 2';
 
 create function pg_temp.crear_funcion(p_sala text, p_cine text, p_inicio timestamptz, p_estado text default 'Activa')
 returns bigint language sql as $f$

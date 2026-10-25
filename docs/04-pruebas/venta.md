@@ -123,7 +123,7 @@ Con la aplicación en modo real (`MOCK=false`), usuario `cliente@imax.test`:
 | Mapa: elegir asientos y reservar | Bloqueo de 2 minutos con contador |
 | Pantalla de pago: tipo de entrada por asiento y total | Desglose con subtotal, descuento, cargo y total |
 | Pago aprobado | Redirige a "Mis entradas" con un boleto y un QR por asiento |
-| Mis entradas | Seis boletos del seed más los de la compra nueva, ordenados por fecha |
+| Mis entradas | Ocho boletos del seed (seis de venta y dos de la demo de check-in) más los de la compra nueva, ordenados por fecha |
 | Reportes con `cliente` | Error de permiso (403) |
 | Reportes con `admin@imax.test` | Ocupación y recaudación de la función, porcentaje por método de pago |
 
