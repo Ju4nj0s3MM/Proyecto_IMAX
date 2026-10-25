@@ -4,6 +4,9 @@ const { call } = require('../db');
 const { requireLogin, requireRole, wrap, isMock } = require('../auth');
 const mock = require('../mock');
 
+// Comprar: cliente, taquillero y admin. Operador de sala y contador no venden (matriz RBAC)
+const compra = requireRole('cliente', 'taquillero', 'administrador');
+
 // RN-03. Contrato: fn_mapa_asientos(funcion) -> asiento_id, fila, numero, zona, estado
 router.get('/funciones/:id/asientos', wrap(async (req, res) => {
   if (isMock()) return res.json(mock.mapa(req.params.id));
@@ -12,7 +15,7 @@ router.get('/funciones/:id/asientos', wrap(async (req, res) => {
 
 // RN-04, RN-05. Contrato: fn_bloquear_asientos(usuario, funcion, asientos[]) -> reserva_id, expira_en
 // El usuario sale de la SESIÓN, nunca del body.
-router.post('/reservas', requireLogin, wrap(async (req, res) => {
+router.post('/reservas', compra, wrap(async (req, res) => {
   if (isMock()) return res.json(mock.reserva());
   const { funcion_id, asientos = [] } = req.body;
   const rows = await call('SELECT * FROM fn_bloquear_asientos($1,$2,$3::bigint[])',
@@ -21,7 +24,7 @@ router.post('/reservas', requireLogin, wrap(async (req, res) => {
 }));
 
 // RN-09, RN-10, RN-11. fn_confirmar_pago(orden, usuario, metodo, resultado)  resultado = APROBADO | RECHAZADO (simulado)
-router.post('/pagos', requireLogin, wrap(async (req, res) => {
+router.post('/pagos', compra, wrap(async (req, res) => {
   // RN-09: jamás aceptar datos de tarjeta
   const prohibidos = ['numero_tarjeta', 'tarjeta', 'cvv', 'cvc', 'card_number'];
   if (prohibidos.some(k => k in req.body)) {
@@ -54,7 +57,7 @@ router.get('/tipos-entrada', requireLogin, wrap(async (req, res) => {
 }));
 
 // Resumen de una orden pendiente: película, función y asientos. Solo el dueño puede verla.
-router.get('/ordenes/:id', requireLogin, wrap(async (req, res) => {
+router.get('/ordenes/:id', compra, wrap(async (req, res) => {
   if (isMock()) return res.json(mock.orden());
   const rows = await call(
     `SELECT o.id AS orden_id, o.estado, o.total, p.titulo, s.nombre AS sala, f.inicio,
@@ -76,7 +79,7 @@ router.get('/ordenes/:id', requireLogin, wrap(async (req, res) => {
 
 // RN-06, RN-07, RN-08. Guarda el tipo de entrada de cada asiento y devuelve el desglose.
 // Contrato: fn_asignar_tipos(orden, usuario, asientos[], tipos[])
-router.post('/ordenes/:id/tipos', requireLogin, wrap(async (req, res) => {
+router.post('/ordenes/:id/tipos', compra, wrap(async (req, res) => {
   const { asientos = [], tipos = [] } = req.body;
   if (isMock()) return res.json({ subtotal: 20, descuento: 0, cargo_servicio: 1, total: 21, detalle: [] });
   const rows = await call('SELECT * FROM fn_asignar_tipos($1,$2,$3::bigint[],$4::bigint[])',
