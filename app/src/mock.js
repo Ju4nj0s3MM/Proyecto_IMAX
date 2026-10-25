@@ -21,6 +21,9 @@ module.exports = {
     return out;
   },
   reserva: () => ({ reserva_id: 1, expira_en: new Date(Date.now() + 120000).toISOString() }),
+  orden: () => ({ orden_id: 1, estado: 'PENDIENTE', total: 0, titulo: 'Dune: Parte Tres', sala: 'Sala 1', inicio: new Date(Date.now() + 86400000).toISOString(),
+                  expira_en: new Date(Date.now() + 120000).toISOString(),
+                  asientos: [{ asiento_id: 5, fila: 'A', numero: 5, precio: null }, { asiento_id: 6, fila: 'A', numero: 6, precio: null }] }),
   pago: ({ resultado }) => resultado === 'APROBADO'
     ? { resultado: 'APROBADO', boletos: [{ boleto_id: 1, codigo_qr: 'IMAX-MOCK-0001' }] }
     : { resultado: 'RECHAZADO', mensaje: 'Pago rechazado: los asientos fueron liberados' },

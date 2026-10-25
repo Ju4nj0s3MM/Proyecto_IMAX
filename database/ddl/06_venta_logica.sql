@@ -127,3 +127,169 @@ begin
 
     return query select v_orden, v_expira;
 end $$;
+
+-- Elige el tipo de entrada de cada asiento bloqueado y calcula los montos de la orden.
+-- Usa fn_calcular_total para precios, 2x1 y cargos, y guarda el resultado en la orden y en cada reserva.
+create function fn_asignar_tipos(p_orden_id bigint, p_usuario_id bigint, p_asientos bigint[], p_tipos bigint[])
+returns table (subtotal numeric, descuento numeric, cargo_servicio numeric, total numeric, detalle jsonb)
+language plpgsql as $$
+declare
+    v_orden orden%rowtype;
+    v_calculo record;
+begin
+    select * into v_orden from orden where id = p_orden_id for update;
+    if not found or v_orden.usuario_id <> p_usuario_id then
+        raise exception 'La orden no existe o no le pertenece';
+    end if;
+    if v_orden.estado <> 'PENDIENTE' then
+        raise exception 'La orden ya no está pendiente (%)', v_orden.estado;
+    end if;
+
+    -- el bloqueo debe seguir vigente
+    if not exists (select 1 from reserva_asiento r
+                   where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO' and r.bloqueado_hasta > now()) then
+        raise exception 'El bloqueo de los asientos ya venció';
+    end if;
+
+    -- los asientos recibidos deben ser exactamente los bloqueados de la orden
+    if cardinality(p_asientos) <> (select count(*) from reserva_asiento r
+                                   where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO')
+       or exists (select 1 from unnest(p_asientos) x
+                  where x not in (select r.asiento_id from reserva_asiento r
+                                  where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO')) then
+        raise exception 'Los asientos no coinciden con los bloqueados de la orden';
+    end if;
+
+    select * into v_calculo from fn_calcular_total(v_orden.funcion_id, p_asientos, p_tipos);
+
+    -- precio, descuento y cargo de cada asiento
+    update reserva_asiento r
+    set tipo_entrada_id = t.tipo_id,
+        precio = (d.linea ->> 'precio')::numeric,
+        descuento = (d.linea ->> 'descuento')::numeric,
+        cargo_servicio = (d.linea ->> 'cargo_servicio')::numeric
+    from unnest(p_asientos, p_tipos) t(asiento_id, tipo_id)
+    join jsonb_array_elements(v_calculo.detalle) d(linea)
+      on (d.linea ->> 'asiento_id')::bigint = t.asiento_id
+    where r.orden_id = p_orden_id and r.asiento_id = t.asiento_id and r.estado = 'BLOQUEADO';
+
+    -- totales de la orden
+    update orden o
+    set subtotal = v_calculo.subtotal,
+        descuento = v_calculo.descuento,
+        cargo_servicio = v_calculo.cargo_servicio,
+        total = v_calculo.total
+    where o.id = p_orden_id;
+
+    return query select v_calculo.subtotal, v_calculo.descuento, v_calculo.cargo_servicio,
+                        v_calculo.total, v_calculo.detalle;
+end $$;
+
+-- Confirma el pago (simulado) de una orden.
+-- APROBADO: asientos VENDIDO, orden PAGADA y se emiten los boletos con su QR único.
+-- RECHAZADO: los asientos se liberan al instante y la orden se cancela.
+-- Es atómica: o se hace todo o no se hace nada.
+create function fn_confirmar_pago(p_orden_id bigint, p_usuario_id bigint, p_metodo varchar, p_resultado varchar)
+returns table (resultado_pago varchar, mensaje varchar, boleto_id bigint, codigo_qr varchar)
+language plpgsql as $$
+declare
+    v_orden orden%rowtype;
+    v_metodo bigint;
+    v_referencia varchar;
+begin
+    if p_resultado not in ('APROBADO', 'RECHAZADO') then
+        raise exception 'El resultado debe ser APROBADO o RECHAZADO';
+    end if;
+
+    select * into v_orden from orden where id = p_orden_id for update;
+    if not found or v_orden.usuario_id <> p_usuario_id then
+        raise exception 'La orden no existe o no le pertenece';
+    end if;
+    if v_orden.estado <> 'PENDIENTE' then
+        raise exception 'La orden ya no está pendiente (%)', v_orden.estado;
+    end if;
+
+    select m.id into v_metodo from metodo_pago m where m.codigo = p_metodo and m.activo;
+    if not found then
+        raise exception 'Método de pago no válido: %', p_metodo;
+    end if;
+
+    -- el bloqueo debe seguir vigente y cada asiento debe tener su tipo de entrada
+    if not exists (select 1 from reserva_asiento r where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO')
+       or exists (select 1 from reserva_asiento r
+                  where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO' and r.bloqueado_hasta <= now()) then
+        raise exception 'El bloqueo de los asientos venció; vuelva a seleccionarlos';
+    end if;
+    if exists (select 1 from reserva_asiento r
+               where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO' and r.precio is null) then
+        raise exception 'Primero debe elegir el tipo de entrada de cada asiento';
+    end if;
+
+    perform fn_crear_particiones_mes(current_date);
+    v_referencia := 'SIM-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12));
+
+    if p_resultado = 'RECHAZADO' then
+        insert into pago (orden_id, metodo_pago_id, monto, resultado, referencia)
+        values (p_orden_id, v_metodo, v_orden.total, 'RECHAZADO', v_referencia);
+
+        -- RN-10: los asientos se liberan de inmediato
+        update reserva_asiento r set estado = 'LIBERADO'
+        where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO';
+        update orden o set estado = 'CANCELADA' where o.id = p_orden_id;
+
+        insert into asiento_auditoria_log (funcion_id, asiento_id, orden_id, usuario_id, estado_anterior, estado_nuevo)
+        select r.funcion_id, r.asiento_id, p_orden_id, p_usuario_id, 'BLOQUEADO', 'LIBERADO'
+        from reserva_asiento r where r.orden_id = p_orden_id and r.estado = 'LIBERADO';
+
+        insert into transaccion_log (orden_id, usuario_id, tipo, monto, resultado, detalle)
+        values (p_orden_id, p_usuario_id, 'PAGO', v_orden.total, 'RECHAZADO', v_referencia),
+               (p_orden_id, p_usuario_id, 'LIBERACION', null, 'OK', 'pago rechazado');
+
+        return query select 'RECHAZADO'::varchar, 'Pago rechazado: los asientos fueron liberados'::varchar,
+                            null::bigint, null::varchar;
+        return;
+    end if;
+
+    -- pago aprobado
+    insert into pago (orden_id, metodo_pago_id, monto, resultado, referencia)
+    values (p_orden_id, v_metodo, v_orden.total, 'APROBADO', v_referencia);
+
+    update reserva_asiento r set estado = 'VENDIDO'
+    where r.orden_id = p_orden_id and r.estado = 'BLOQUEADO';
+    update orden o set estado = 'PAGADA', pagada_en = now() where o.id = p_orden_id;
+
+    -- RN-11 y RN-12: los boletos se emiten solo después del pago aprobado, cada uno con un QR único
+    insert into boleto (orden_id, reserva_asiento_id, funcion_id, asiento_id, codigo_qr)
+    select r.orden_id, r.id, r.funcion_id, r.asiento_id,
+           'IMAX-' || upper(replace(gen_random_uuid()::text, '-', ''))
+    from reserva_asiento r
+    where r.orden_id = p_orden_id and r.estado = 'VENDIDO';
+
+    insert into asiento_auditoria_log (funcion_id, asiento_id, orden_id, usuario_id, estado_anterior, estado_nuevo)
+    select r.funcion_id, r.asiento_id, p_orden_id, p_usuario_id, 'BLOQUEADO', 'VENDIDO'
+    from reserva_asiento r where r.orden_id = p_orden_id and r.estado = 'VENDIDO';
+
+    insert into transaccion_log (orden_id, usuario_id, tipo, monto, resultado, detalle)
+    values (p_orden_id, p_usuario_id, 'PAGO', v_orden.total, 'APROBADO', v_referencia),
+           (p_orden_id, p_usuario_id, 'EMISION_BOLETO', null, 'OK',
+            (select count(*) from boleto b where b.orden_id = p_orden_id) || ' boleto(s)');
+
+    return query select 'APROBADO'::varchar, 'Pago aprobado'::varchar, b.id, b.codigo_qr
+                 from boleto b where b.orden_id = p_orden_id order by b.id;
+end $$;
+
+-- Boletos de un usuario, los más próximos primero (RN-13)
+create function fn_mis_boletos(p_usuario_id bigint)
+returns table (boleto_id bigint, codigo_qr varchar, titulo varchar, inicio timestamptz,
+               sala varchar, fila varchar, numero integer, estado varchar)
+language sql stable as $$
+    select b.id, b.codigo_qr, p.titulo, f.inicio, s.nombre, a.fila, a.numero, b.estado
+    from boleto b
+    join orden o on o.id = b.orden_id
+    join funcion f on f.id = b.funcion_id
+    join pelicula p on p.id = f.pelicula_id
+    join sala s on s.id = f.sala_id
+    join asiento a on a.id = b.asiento_id
+    where o.usuario_id = p_usuario_id
+    order by f.inicio desc, a.fila, a.numero;
+$$;

@@ -343,3 +343,206 @@ select * from fn_bloquear_asientos(2, 1, array[1]);
 -- Resultado esperado: filas de BLOQUEADO y de EXPIRADO para el asiento 1; transacciones de tipo BLOQUEO
 select asiento_id, estado_anterior, estado_nuevo from asiento_auditoria_log where asiento_id = 1 order by id;
 select tipo, resultado, detalle from transaccion_log order by id;
+
+-- Pruebas de fn_asignar_tipos 
+-- Se corre sobre una base nueva con todos los DDL (incluida la lógica de catálogo de Mati) y el seed.
+-- Tipos de entrada: 1 Adulto, 2 Niño, 3 Adulto mayor, 4 Estudiante. Usuarios 1 y 2. Función 1, asientos 1 a 80.
+-- Los precios del seed dependen del día y la hora de la función, por eso se comparan contra fn_calcular_total.
+
+select * from fn_bloquear_asientos(1, 1, array[1, 2]);
+
+-- Prueba 1: elegir tipo Adulto para los dos asientos
+-- Resultado esperado: FUNCIONA, devuelve subtotal, descuento, cargo, total y el detalle por asiento
+select subtotal, descuento, cargo_servicio, total from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+
+-- Prueba 2: la orden guardó los mismos montos que calcula fn_calcular_total
+-- Resultado esperado: coincide = true
+select o.total = c.total and o.subtotal = c.subtotal as coincide
+from orden o, fn_calcular_total(1, array[1, 2], array[1, 1]) c
+where o.id = 1;
+
+-- Prueba 3: cada reserva guardó su tipo de entrada y su precio
+-- Resultado esperado: 2 filas con tipo_entrada_id = 1 y precio mayor que 0
+select asiento_id, tipo_entrada_id, precio, cargo_servicio from reserva_asiento where orden_id = 1 order by asiento_id;
+
+-- Prueba 4: otro usuario intenta asignar tipos a esa orden
+-- Resultado esperado: ERROR (la orden no le pertenece)
+select * from fn_asignar_tipos(1, 2, array[1, 2], array[1, 1]);
+
+-- Prueba 5: asientos que no son los bloqueados
+-- Resultado esperado: ERROR (no coinciden con los bloqueados)
+select * from fn_asignar_tipos(1, 1, array[1, 3], array[1, 1]);
+
+-- Prueba 6: faltan asientos de la orden
+-- Resultado esperado: ERROR (no coinciden con los bloqueados)
+select * from fn_asignar_tipos(1, 1, array[1], array[1]);
+
+-- Prueba 7: dos entradas de estudiante activan el 2x1 de estudiantes
+-- Resultado esperado: descuento mayor que 0
+select * from fn_bloquear_asientos(2, 1, array[10, 11]);
+select descuento > 0 as hay_descuento_2x1 from fn_asignar_tipos(2, 2, array[10, 11], array[4, 4]);
+
+-- Prueba 8: el bloqueo ya venció
+-- Resultado esperado: ERROR (el bloqueo ya venció)
+update reserva_asiento set bloqueado_hasta = now() - interval '1 minute' where orden_id = 1;
+select * from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+
+-- Prueba 9: la orden ya no está pendiente
+-- Resultado esperado: ERROR (la orden ya no está pendiente)
+update orden set estado = 'CANCELADA' where id = 1;
+select * from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+
+-- Pruebas de fn_confirmar_pago
+-- Se corre sobre una base nueva con todos los DDL y el seed del catálogo.
+-- Función 1, asientos 1 a 80. Usuarios 1 y 2. Tipo de entrada 1 = Adulto.
+
+insert into metodo_pago (codigo, nombre) values ('TARJETA_SIMULADA', 'Tarjeta simulada');
+
+-- Orden 1: usuario 1 bloquea los asientos 1 y 2 y elige tipo Adulto
+select * from fn_bloquear_asientos(1, 1, array[1, 2]);
+select total from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+
+-- Prueba 1: pago aprobado
+-- Resultado esperado: 2 filas APROBADO, cada una con su boleto y su código QR
+select resultado_pago, boleto_id, codigo_qr from fn_confirmar_pago(1, 1, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 2: estado después del pago
+-- Resultado esperado: orden PAGADA con fecha de pago; reservas VENDIDO; 1 pago APROBADO por el total de la orden
+select estado, pagada_en is not null as tiene_fecha from orden where id = 1;
+select asiento_id, estado from reserva_asiento where orden_id = 1 order by asiento_id;
+select p.resultado, p.monto = o.total as monto_correcto from pago p join orden o on o.id = p.orden_id where o.id = 1;
+
+-- Prueba 3: los códigos QR son distintos entre sí
+-- Resultado esperado: 2 boletos y 2 códigos distintos
+select count(*) as boletos, count(distinct codigo_qr) as codigos_distintos from boleto;
+
+-- Prueba 4: volver a pagar la misma orden
+-- Resultado esperado: ERROR (la orden ya no está pendiente)
+select * from fn_confirmar_pago(1, 1, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Orden 2: usuario 1 bloquea los asientos 10 y 11 y elige tipo Adulto
+select * from fn_bloquear_asientos(1, 1, array[10, 11]);
+select total from fn_asignar_tipos(2, 1, array[10, 11], array[1, 1]);
+
+-- Prueba 5: pago rechazado
+-- Resultado esperado: RECHAZADO, sin boleto ni código QR
+select * from fn_confirmar_pago(2, 1, 'TARJETA_SIMULADA', 'RECHAZADO');
+
+-- Prueba 6: los asientos se liberaron al instante, no se emitió ningún boleto
+-- Resultado esperado: orden CANCELADA; reservas LIBERADO; asientos 10 y 11 DISPONIBLE; sigue habiendo solo 2 boletos
+select estado from orden where id = 2;
+select asiento_id, estado from reserva_asiento where orden_id = 2 order by asiento_id;
+select asiento_id, estado from fn_mapa_asientos(1) where asiento_id in (1, 2, 10, 11) order by asiento_id;
+select count(*) as boletos from boleto;
+
+-- Prueba 7: otro usuario ya puede tomar el asiento 10 apenas se rechazó el pago
+-- Resultado esperado: FUNCIONA
+select * from fn_bloquear_asientos(2, 1, array[10]);
+
+-- Prueba 8: otro usuario intenta pagar una orden ajena (la orden 3 es del usuario 2)
+-- Resultado esperado: ERROR (la orden no le pertenece)
+select * from fn_confirmar_pago(3, 1, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 9: pagar sin haber elegido el tipo de entrada
+-- Resultado esperado: ERROR (primero debe elegir el tipo de entrada)
+select * from fn_confirmar_pago(3, 2, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 10: método de pago que no existe, y resultado inválido
+-- Resultado esperado: ERROR en los dos
+select * from fn_confirmar_pago(3, 2, 'BITCOIN', 'APROBADO');
+select * from fn_confirmar_pago(3, 2, 'TARJETA_SIMULADA', 'TAL_VEZ');
+
+-- Prueba 11: el bloqueo venció antes de pagar
+-- Resultado esperado: ERROR (el bloqueo venció)
+select total from fn_asignar_tipos(3, 2, array[10], array[1]);
+update reserva_asiento set bloqueado_hasta = now() - interval '1 minute' where orden_id = 3;
+select * from fn_confirmar_pago(3, 2, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 12: quedó todo en las bitácoras
+-- Resultado esperado: VENDIDO x2, LIBERADO x2 en asientos; PAGO APROBADO, EMISION_BOLETO, PAGO RECHAZADO y LIBERACION en transacciones
+select estado_nuevo, count(*) from asiento_auditoria_log where estado_nuevo in ('VENDIDO', 'LIBERADO') group by estado_nuevo order by 1;
+select tipo, resultado from transaccion_log where tipo in ('PAGO', 'EMISION_BOLETO', 'LIBERACION') order by id;
+
+-- Revisión del seed de venta
+-- Resultado esperado: PAGADA x3, CANCELADA x1, EXPIRADA x1, PENDIENTE x1
+select estado, count(*) from orden group by estado order by estado;
+
+-- Resultado esperado: 6 boletos EMITIDO (2 + 3 + 1) y todos con QR distinto
+select count(*) as boletos, count(distinct codigo_qr) as qr_distintos from boleto where estado = 'EMITIDO';
+
+-- Resultado esperado: APROBADO x3 y RECHAZADO x1
+select resultado, count(*) from pago group by resultado order by resultado;
+
+-- Resultado esperado: asientos 1, 2, 10, 11, 12 VENDIDO; 20, 21, 30, 31 DISPONIBLE; 40 BLOQUEADO
+select asiento_id, estado from fn_mapa_asientos(1)
+where asiento_id in (1, 2, 10, 11, 12, 20, 21, 30, 31, 40) order by asiento_id;
+
+-- Resultado esperado: asiento 50 VENDIDO en la función 2 y DISPONIBLE en la función 1
+select 2 as funcion, estado from fn_mapa_asientos(2) where asiento_id = 50
+union all
+select 1, estado from fn_mapa_asientos(1) where asiento_id = 50;
+
+-- Pruebas de las consultas sobre el seed de venta (10_metodos_pago.sql y 11_seed_venta.sql)
+
+-- Prueba 1 (consulta 1, función 1): ocupación y recaudación
+-- Resultado esperado: 5 asientos vendidos de 80, 6.25 % de ocupación y 57.75 recaudado (órdenes 1 y 2)
+select (select count(*) from boleto b where b.funcion_id = 1 and b.estado <> 'ANULADO') as vendidos,
+       (select sum(total) from orden where funcion_id = 1 and estado = 'PAGADA') as recaudado;
+
+-- Prueba 2: una función sin ventas
+-- Resultado esperado: 0 vendidos, 0.00 % y recaudado 0
+select f.id,
+       (select count(*) from boleto b where b.funcion_id = f.id and b.estado <> 'ANULADO') as vendidos,
+       coalesce((select sum(o.total) from orden o where o.funcion_id = f.id and o.estado = 'PAGADA'), 0) as recaudado
+  from funcion f where f.id = 3;
+
+-- Prueba 3: un boleto anulado deja de contar en la ocupación
+-- Resultado esperado: baja de 5 a 4 vendidos
+update boleto set estado = 'ANULADO' where id = 1;
+select count(*) as vendidos from boleto where funcion_id = 1 and estado <> 'ANULADO';
+update boleto set estado = 'EMITIDO' where id = 1;
+
+-- Prueba 4 (consulta 3): los pagos rechazados no cuentan
+-- Resultado esperado: 3 pagos aprobados en total, 33.33 % cada método
+select count(*) as aprobados from pago where resultado = 'APROBADO';
+
+-- Prueba 5: un método que nadie ha usado sale con cero pagos
+-- Resultado esperado: el método nuevo aparece con 0 pagos y 0.00 %; los demás siguen en 33.33 %
+-- (después de insertar, correr de nuevo 21_consulta_metodos_pago.sql)
+insert into metodo_pago (codigo, nombre) values ('PRUEBA', 'Método de prueba');
+
+-- Pruebas de fn_mis_boletos 
+-- Se corre sobre una base nueva con todos los DDL y el seed del catálogo.
+
+insert into metodo_pago (codigo, nombre) values ('TARJETA_SIMULADA', 'Tarjeta simulada');
+
+-- Prueba 1: antes de comprar no hay boletos
+-- Resultado esperado: 0 filas
+select count(*) from fn_mis_boletos(1);
+
+-- El usuario 1 compra 2 asientos; el usuario 2 compra 1
+select * from fn_bloquear_asientos(1, 1, array[1, 2]);
+select total from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+select resultado_pago from fn_confirmar_pago(1, 1, 'TARJETA_SIMULADA', 'APROBADO');
+select * from fn_bloquear_asientos(2, 1, array[20]);
+select total from fn_asignar_tipos(2, 2, array[20], array[1]);
+select resultado_pago from fn_confirmar_pago(2, 2, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 2: el usuario 1 ve sus 2 boletos con película, sala, asiento y estado
+-- Resultado esperado: 2 filas EMITIDO (asientos 1 y 2 de la sala, ver fila y número)
+select boleto_id, codigo_qr, titulo, sala, fila, numero, estado from fn_mis_boletos(1);
+
+-- Prueba 3: el usuario 2 solo ve el suyo
+-- Resultado esperado: 1 fila
+select count(*) from fn_mis_boletos(2);
+
+-- Prueba 4: un usuario sin compras
+-- Resultado esperado: 0 filas
+select count(*) from fn_mis_boletos(3);
+
+-- Prueba 5: un boleto pagado y otro de un pago rechazado
+-- Resultado esperado: el rechazado no genera boleto (el usuario 1 sigue con 2)
+select * from fn_bloquear_asientos(1, 1, array[30]);
+select total from fn_asignar_tipos(3, 1, array[30], array[1]);
+select resultado_pago from fn_confirmar_pago(3, 1, 'TARJETA_SIMULADA', 'RECHAZADO');
+select count(*) from fn_mis_boletos(1);

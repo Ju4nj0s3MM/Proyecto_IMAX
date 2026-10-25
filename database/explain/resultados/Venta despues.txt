@@ -1,0 +1,120 @@
+QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=0.98..38.05 rows=1 width=66) (actual time=0.163..0.164 rows=1 loops=1)
+   Buffers: shared hit=15 read=6
+   ->  Nested Loop  (cost=0.70..16.76 rows=1 width=30) (actual time=0.045..0.046 rows=1 loops=1)
+         Buffers: shared hit=10
+         ->  Index Scan using funcion_pkey on funcion f  (cost=0.42..8.44 rows=1 width=24) (actual time=0.036..0.037 rows=1 loops=1)
+               Index Cond: (id = 500001)
+               Buffers: shared hit=7
+         ->  Index Scan using pelicula_pkey on pelicula p  (cost=0.27..8.29 rows=1 width=22) (actual time=0.005..0.005 rows=1 loops=1)
+               Index Cond: (id = f.pelicula_id)
+               Buffers: shared hit=3
+   ->  Index Scan using sala_pkey on sala s  (cost=0.28..8.29 rows=1 width=12) (actual time=0.012..0.012 rows=1 loops=1)
+         Index Cond: (id = f.sala_id)
+         Buffers: shared hit=3
+   SubPlan 1
+     ->  Aggregate  (cost=4.51..4.52 rows=1 width=8) (actual time=0.042..0.042 rows=1 loops=1)
+           Buffers: shared hit=1 read=3
+           ->  Index Only Scan using idx_boleto_funcion on boleto b  (cost=0.43..4.50 rows=4 width=0) (actual time=0.037..0.037 rows=2 loops=1)
+                 Index Cond: (funcion_id = f.id)
+                 Heap Fetches: 0
+                 Buffers: shared hit=1 read=3
+   SubPlan 2
+     ->  Aggregate  (cost=8.45..8.46 rows=1 width=32) (actual time=0.031..0.031 rows=1 loops=1)
+           Buffers: shared hit=1 read=3
+           ->  Index Scan using idx_orden_funcion_estado on orden o  (cost=0.42..8.45 rows=1 width=5) (actual time=0.027..0.027 rows=1 loops=1)
+                 Index Cond: ((funcion_id = f.id) AND ((estado)::text = 'PAGADA'::text))
+                 Buffers: shared hit=1 read=3
+ Planning:
+   Buffers: shared hit=421
+ Planning Time: 1.375 ms
+ Execution Time: 0.257 ms
+(30 rows)
+
+                                                                QUERY PLAN                                                                
+------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=22519.45..22520.25 rows=320 width=186) (actual time=254.213..254.216 rows=3 loops=1)
+   Sort Key: (count(p.id)) DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=2388 read=5871
+   ->  WindowAgg  (cost=22494.93..22506.13 rows=320 width=186) (actual time=254.194..254.199 rows=3 loops=1)
+         Buffers: shared hit=2385 read=5871
+         ->  HashAggregate  (cost=22494.93..22498.13 rows=320 width=154) (actual time=254.166..254.170 rows=3 loops=1)
+               Group Key: m.id
+               Batches: 1  Memory Usage: 37kB
+               Buffers: shared hit=2385 read=5871
+               ->  Hash Right Join  (cost=17.20..19137.75 rows=671437 width=154) (actual time=0.034..179.446 rows=670500 loops=1)
+                     Hash Cond: (p.metodo_pago_id = m.id)
+                     Buffers: shared hit=2385 read=5871
+                     ->  Seq Scan on pago p  (cost=0.00..17334.69 rows=671437 width=16) (actual time=0.015..88.480 rows=670500 loops=1)
+                           Filter: ((resultado)::text = 'APROBADO'::text)
+                           Rows Removed by Filter: 55875
+                           Buffers: shared hit=2384 read=5871
+                     ->  Hash  (cost=13.20..13.20 rows=320 width=146) (actual time=0.011..0.012 rows=3 loops=1)
+                           Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                           Buffers: shared hit=1
+                           ->  Seq Scan on metodo_pago m  (cost=0.00..13.20 rows=320 width=146) (actual time=0.006..0.007 rows=3 loops=1)
+                                 Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=96
+ Planning Time: 0.255 ms
+ Execution Time: 254.252 ms
+(26 rows)
+
+                                                                              QUERY PLAN                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Subquery Scan on "*SELECT*"  (cost=604.69..605.14 rows=180 width=108) (actual time=2.271..2.313 rows=180 loops=1)
+   Buffers: shared hit=201
+   ->  Sort  (cost=604.69..605.14 rows=180 width=78) (actual time=2.269..2.283 rows=180 loops=1)
+         Sort Key: a.fila, a.numero
+         Sort Method: quicksort  Memory: 35kB
+         Buffers: shared hit=201
+         ->  Hash Left Join  (cost=26.84..597.94 rows=180 width=78) (actual time=0.126..2.093 rows=180 loops=1)
+               Hash Cond: (a.id = r.asiento_id)
+               Buffers: shared hit=195
+               ->  Nested Loop  (cost=6.40..574.34 rows=180 width=120) (actual time=0.081..1.994 rows=180 loops=1)
+                     Buffers: shared hit=191
+                     ->  Nested Loop  (cost=6.24..569.21 rows=180 width=30) (actual time=0.070..1.895 rows=180 loops=1)
+                           Buffers: shared hit=187
+                           ->  Index Scan using funcion_pkey on funcion f  (cost=0.42..8.44 rows=1 width=16) (actual time=0.009..0.011 rows=1 loops=1)
+                                 Index Cond: (id = '500001'::bigint)
+                                 Buffers: shared hit=4
+                           ->  Bitmap Heap Scan on asiento a  (cost=5.82..558.97 rows=180 width=30) (actual time=0.058..1.858 rows=180 loops=1)
+                                 Recheck Cond: (sala_id = f.sala_id)
+                                 Filter: activo
+                                 Heap Blocks: exact=180
+                                 Buffers: shared hit=183
+                                 ->  Bitmap Index Scan on uq_asiento_sala_fila_numero  (cost=0.00..5.77 rows=180 width=0) (actual time=0.027..0.027 rows=180 loops=1)
+                                       Index Cond: (sala_id = f.sala_id)
+                                       Buffers: shared hit=3
+                     ->  Memoize  (cost=0.15..0.17 rows=1 width=106) (actual time=0.000..0.000 rows=1 loops=180)
+                           Cache Key: a.zona_asiento_id
+                           Cache Mode: logical
+                           Hits: 178  Misses: 2  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                           Buffers: shared hit=4
+                           ->  Index Scan using zona_asiento_pkey on zona_asiento z  (cost=0.14..0.16 rows=1 width=106) (actual time=0.004..0.004 rows=1 loops=2)
+                                 Index Cond: (id = a.zona_asiento_id)
+                                 Buffers: shared hit=4
+               ->  Hash  (cost=20.39..20.39 rows=4 width=32) (actual time=0.035..0.035 rows=2 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                     Buffers: shared hit=4
+                     ->  Index Scan using uq_asiento_activo on reserva_asiento r  (cost=0.43..20.39 rows=4 width=32) (actual time=0.030..0.031 rows=2 loops=1)
+                           Index Cond: (funcion_id = '500001'::bigint)
+                           Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=399 read=1
+ Planning Time: 1.432 ms
+ Execution Time: 2.377 ms
+(42 rows)
+
+                                                             QUERY PLAN                                                              
+-------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using idx_reserva_bloqueo on reserva_asiento  (cost=0.13..8.14 rows=1 width=8) (actual time=0.002..0.002 rows=0 loops=1)
+   Index Cond: (bloqueado_hasta < now())
+   Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=10
+ Planning Time: 0.153 ms
+ Execution Time: 0.009 ms
+(7 rows)

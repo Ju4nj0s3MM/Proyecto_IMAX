@@ -4,8 +4,17 @@
 <main>
   <h1>Resumen y pago (simulado)</h1>
   <div class="card">
-    <div class="todo"><strong>TODO (Juanjo):</strong> mostrar el resumen de la reserva, tipo de entrada por asiento, desglose de tarifas,
-      promoción 2x1 y total (<code>POST /api/catalogo/total</code>).</div>
+    <h3 id="titulo"></h3>
+    <p class="muted" id="info"></p>
+    <p>Tiempo para pagar: <span class="timer" id="timer">02:00</span></p>
+    <table id="asientos"></table>
+    <button id="calcular">Calcular total</button>
+    <div id="desglose" hidden>
+      <p>Subtotal: <strong id="subtotal"></strong> · Descuento: <strong id="descuento"></strong> · Cargo por servicio: <strong id="cargo"></strong></p>
+      <h2>Total: <span id="total"></span></h2>
+    </div>
+  </div>
+  <div class="card" id="pago" hidden>
     <p class="muted">Pago simulado: <strong>no se piden ni se guardan datos de tarjeta</strong> (RN-09).</p>
     <div class="row">
       <label>Método <select id="metodo"><option>TARJETA_SIMULADA</option><option>PAYPAL_SIMULADO</option><option>BILLETERA_SIMULADA</option></select></label>
@@ -17,15 +26,60 @@
 </main>
 <script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required"></script>
 <script>
-  const reserva = qs('reserva'), msg = document.getElementById('msg');
+  const orden = qs('reserva'), msg = document.getElementById('msg');
+  let datos = null, tipos = [], timerInt = null;
+
+  async function cargar() {
+    try {
+      [datos, tipos] = await Promise.all([api(`/venta/ordenes/${orden}`), api('/venta/tipos-entrada')]);
+    } catch (e) { return mostrarMensaje(msg, e.message + ' Vuelve al mapa y selecciona de nuevo.', 'err'); }
+    document.getElementById('titulo').textContent = datos.titulo;
+    document.getElementById('info').textContent = `${datos.sala} · ${fmtFecha(datos.inicio)}`;
+    document.getElementById('asientos').innerHTML = datos.asientos.map(a => `
+      <tr><td>Asiento ${a.fila}${a.numero}</td>
+          <td><select data-asiento="${a.asiento_id}">${tipos.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('')}</select></td></tr>`).join('');
+    iniciarCuenta(new Date(datos.expira_en).getTime());
+  }
+
+  function iniciarCuenta(expiraMs) {
+    timerInt = setInterval(() => {
+      const resta = Math.max(0, Math.floor((expiraMs - Date.now()) / 1000));
+      document.getElementById('timer').textContent =
+        String(Math.floor(resta / 60)).padStart(2, '0') + ':' + String(resta % 60).padStart(2, '0');
+      if (resta === 0) {
+        clearInterval(timerInt);
+        mostrarMensaje(msg, 'Se agotó el tiempo: los asientos fueron liberados.', 'err');
+        document.getElementById('pago').hidden = true;
+        document.getElementById('calcular').disabled = true;
+      }
+    }, 500);
+  }
+
+  // guarda el tipo de cada asiento y muestra el desglose (incluye el 2x1 si aplica)
+  document.getElementById('calcular').onclick = async () => {
+    const combos = [...document.querySelectorAll('#asientos select')];
+    try {
+      const t = await api(`/venta/ordenes/${orden}/tipos`, { method: 'POST',
+        body: { asientos: combos.map(c => +c.dataset.asiento), tipos: combos.map(c => +c.value) } });
+      document.getElementById('subtotal').textContent = t.subtotal;
+      document.getElementById('descuento').textContent = t.descuento;
+      document.getElementById('cargo').textContent = t.cargo_servicio;
+      document.getElementById('total').textContent = t.total;
+      document.getElementById('desglose').hidden = false;
+      document.getElementById('pago').hidden = false;
+      msg.hidden = true;
+    } catch (e) { mostrarMensaje(msg, e.message, 'err'); }
+  };
+
   async function pagar(resultado) {
     try {
-      await api('/venta/pagos', { method: 'POST', body: { reserva_id: +reserva, metodo: document.getElementById('metodo').value, resultado } });
-      if (resultado === 'APROBADO') location.href = '/venta/mis-entradas.html';
-      else mostrarMensaje(msg, 'Pago rechazado: los asientos fueron liberados.', 'err');
+      const r = await api('/venta/pagos', { method: 'POST', body: { reserva_id: +orden, metodo: document.getElementById('metodo').value, resultado } });
+      if (r.resultado === 'APROBADO') location.href = '/venta/mis-entradas.html';
+      else { clearInterval(timerInt); document.getElementById('pago').hidden = true; mostrarMensaje(msg, r.mensaje || 'Pago rechazado: los asientos fueron liberados.', 'err'); }
     } catch (e) { mostrarMensaje(msg, e.message, 'err'); }
   }
   document.getElementById('aprobar').onclick = () => pagar('APROBADO');
   document.getElementById('rechazar').onclick = () => pagar('RECHAZADO');
+  cargar();
 </script>
 </body></html>
