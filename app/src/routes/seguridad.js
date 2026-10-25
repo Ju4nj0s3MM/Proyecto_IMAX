@@ -3,6 +3,7 @@ const router = require('express').Router();
 const { call } = require('../db');
 const { requireLogin, requireRole, wrap, isMock } = require('../auth');
 const mock = require('../mock');
+const acceso = () => isMock() ? require('../repos/acceso-mock') : require('../repos/acceso-sql');
 
 const ROLES = ['cliente', 'taquillero', 'operador_sala', 'contador', 'administrador'];
 
@@ -35,25 +36,50 @@ router.get('/me', (req, res) => req.session.user ? res.json(req.session.user) : 
 // RN-14, RN-15, RN-16. Contrato: fn_validar_entrada(codigo_qr, puerta) -> ok boolean, mensaje text
 router.post('/checkin', requireRole('operador_sala', 'administrador'), wrap(async (req, res) => {
   const { codigo_qr, puerta_id } = req.body;
-  if (isMock()) return res.json(mock.checkin(codigo_qr));
-  const rows = await call('SELECT * FROM fn_validar_entrada($1,$2)', [codigo_qr, puerta_id]);
+  if (!codigo_qr || !Number.isInteger(Number(puerta_id))) {
+    return res.status(400).json({ error: 'Indique el código QR y la puerta' });
+  }
+  if (isMock()) {
+    const r = mock.checkin(codigo_qr);
+    acceso().registrarLectura(codigo_qr, puerta_id, r);
+    return res.json(r);
+  }
+  const rows = await call('SELECT * FROM fn_validar_entrada($1,$2)', [codigo_qr, Number(puerta_id)]);
   res.json(rows[0] || {});
 }));
 
-// RN-19, RN-20. Contrato: fn_reembolsar(boleto, admin, motivo). El admin sale de la SESIÓN.
+router.get('/puertas', requireRole('operador_sala', 'administrador'), wrap(async (req, res) => {
+  res.json(await acceso().puertas());
+}));
+
+router.get('/accesos', requireRole('operador_sala', 'administrador'), wrap(async (req, res) => {
+  res.json(await acceso().accesosRecientes(15));
+}));
+
+// RN-19, RN-20. Contrato: fn_reembolsar(boleto, admin, motivo, ip). El admin sale de la SESIÓN.
+router.get('/boletos', requireRole('administrador'), wrap(async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: 'Indique el código QR o el ID del boleto' });
+  const b = await acceso().buscarBoleto(q);
+  if (!b) return res.status(404).json({ error: 'Boleto no encontrado' });
+  res.json(b);
+}));
+
 router.post('/reembolsos', requireRole('administrador'), wrap(async (req, res) => {
   const { boleto_id, motivo } = req.body;
-  if (isMock()) return res.json({ ok: true, mensaje: 'Reembolso registrado (mock)' });
-  res.json(await call('SELECT * FROM fn_reembolsar($1,$2,$3)', [boleto_id, req.session.user.id, motivo]));
+  if (!Number.isInteger(Number(boleto_id))) return res.status(400).json({ error: 'Boleto inválido' });
+  res.json(await acceso().reembolsar(Number(boleto_id), req.session.user.id, motivo, req.ip));
 }));
 
-// TODO (Brandon): consulta #4 (auditoría del último mes agrupada por admin) y visor de bitácora
+// Bitácora de operaciones administrativas (admin_operacion_audit)
 router.get('/auditoria', requireRole('administrador'), wrap(async (req, res) => {
-  if (isMock()) return res.json(mock.auditoria);
-  res.status(501).json({ error: 'TODO Brandon: consulta de admin_operacion_audit' });
+  res.json(await acceso().auditoria(100));
 }));
 
-// TODO (Brandon, opcional): ejecutar cada request con el rol de PostgreSQL del usuario (SET ROLE rol_x) para que el RBAC también lo aplique la BD.
+// Consulta analítica #4: operaciones del último mes agrupadas por administrador
+router.get('/auditoria/resumen', requireRole('administrador'), wrap(async (req, res) => {
+  res.json(await acceso().resumenAuditoria());
+}));
 
 // Administración de usuarios, roles y usuario_rol (tablas de 01_catalogo.sql). Ver src/routes/seguridad-admin.js
 router.use('/admin', require('./seguridad-admin'));

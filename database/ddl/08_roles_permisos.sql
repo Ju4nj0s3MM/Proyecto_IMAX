@@ -49,3 +49,12 @@ grant select on admin_operacion_audit to rol_administrador;
 grant execute on function fn_registrar_usuario(text, text, text, text, text) to rol_administrador;
 grant execute on function fn_registrar_auditoria(bigint, inet, text, text, bigint, text, jsonb)
     to rol_administrador;
+
+-- Check-in y reembolsos
+revoke execute on function fn_validar_entrada(text, bigint) from public;
+revoke execute on function fn_reembolsar(bigint, bigint, text, inet) from public;
+
+grant execute on function fn_validar_entrada(text, bigint) to rol_operador_sala, rol_administrador;
+grant execute on function fn_reembolsar(bigint, bigint, text, inet) to rol_administrador;
+grant select on reembolso to rol_administrador, rol_contador;
+grant select on acceso_puerta_log to rol_administrador;

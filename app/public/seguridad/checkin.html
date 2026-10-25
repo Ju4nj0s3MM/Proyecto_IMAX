@@ -1,25 +1,68 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Check-in</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css">
+<style>
+  #resultado.grande { font-size: 1.5rem; font-weight: 600; text-align: center; padding: 24px; }
+  td.ok { color: var(--ok); }
+  td.rechazo { color: var(--err); }
+</style></head>
 <body>
 <main>
   <h1>Check-in en puerta</h1>
   <div class="card row">
-    <label>Código QR <input id="codigo" placeholder="pega o escanea el código" size="30"></label>
-    <label>Puerta <input id="puerta" type="number" value="1" min="1"></label>
+    <label>Puerta <select id="puerta"></select></label>
+    <label>Código QR <input id="codigo" placeholder="escanea o pega el código" size="32" autofocus></label>
     <button id="validar">Validar entrada</button>
   </div>
   <div id="resultado" class="msg" hidden></div>
+  <div class="card">
+    <h2>Últimas lecturas</h2>
+    <table>
+      <thead><tr><th>Hora</th><th>Puerta</th><th>Código</th><th>Resultado</th></tr></thead>
+      <tbody id="filas"></tbody>
+    </table>
+  </div>
 </main>
 <script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required" data-roles="operador_sala,administrador"></script>
 <script>
-  // RN-14, RN-15, RN-16. El mensaje lo decide la BD ("Entrada ya utilizada", otra función, fuera de tolerancia).
+  // RN-14, RN-15, RN-16. El mensaje lo decide la BD (fn_validar_entrada).
   const out = document.getElementById('resultado');
-  document.getElementById('validar').onclick = async () => {
+  const codigo = document.getElementById('codigo');
+  const puerta = document.getElementById('puerta');
+  const filas = document.getElementById('filas');
+
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  async function cargarPuertas() {
+    const puertas = await api('/seguridad/puertas');
+    puerta.innerHTML = puertas.map(p => `<option value="${p.id}">${esc(p.cine)} · ${esc(p.sala)} · ${esc(p.nombre)}</option>`).join('');
+  }
+
+  async function cargarLecturas() {
+    const rows = await api('/seguridad/accesos');
+    filas.innerHTML = rows.map(r => {
+      const ok = r.resultado === 'EXITOSO';
+      return `<tr><td>${fmtFecha(r.fecha)}</td><td>${esc(r.puerta)}</td><td>${esc(r.codigo_qr)}</td>` +
+             `<td class="${ok ? 'ok' : 'rechazo'}">${ok ? '✔' : '✖'} ${esc(r.motivo)}</td></tr>`;
+    }).join('');
+  }
+
+  async function validar() {
+    const qr = codigo.value.trim();
+    if (!qr) return;
     try {
-      const r = await api('/seguridad/checkin', { method: 'POST',
-        body: { codigo_qr: document.getElementById('codigo').value.trim(), puerta_id: +document.getElementById('puerta').value } });
-      mostrarMensaje(out, r.mensaje || JSON.stringify(r), r.ok ? 'ok' : 'err');
+      const r = await api('/seguridad/checkin', { method: 'POST', body: { codigo_qr: qr, puerta_id: +puerta.value } });
+      mostrarMensaje(out, r.mensaje || 'Sin respuesta', r.ok ? 'ok' : 'err');
     } catch (e) { mostrarMensaje(out, e.message, 'err'); }
-  };
+    out.classList.add('grande');
+    codigo.value = '';
+    codigo.focus();
+    cargarLecturas().catch(() => {});
+  }
+
+  document.getElementById('validar').onclick = validar;
+  codigo.addEventListener('keydown', e => { if (e.key === 'Enter') validar(); });
+
+  cargarPuertas().then(cargarLecturas)
+    .catch(e => mostrarMensaje(out, e.message, 'err'));
 </script>
 </body></html>

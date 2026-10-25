@@ -63,3 +63,54 @@ $$;
 create trigger trg_admin_audit_inmutable
     before update or delete on admin_operacion_audit
     for each row execute function trg_audit_inmutable();
+
+    create table acceso_puerta_log (
+    id bigint generated always as identity,
+    fecha timestamptz not null default now(),
+    boleto_id bigint,
+    codigo_qr varchar(64) not null,
+    puerta_id bigint,
+    resultado varchar(10) not null,
+    motivo varchar(60) not null,
+    constraint pk_acceso_puerta_log primary key (id, fecha),
+    constraint ck_acceso_resultado check (resultado in ('EXITOSO', 'RECHAZADO'))
+) partition by range (fecha);
+
+create index idx_acceso_log_boleto on acceso_puerta_log (boleto_id, fecha);
+create index idx_acceso_log_puerta on acceso_puerta_log (puerta_id, fecha);
+
+-- Una partición por mes, de octubre de 2026 a diciembre de 2027
+do $$
+declare
+    v_mes date;
+begin
+    for v_mes in select generate_series('2026-10-01'::date, '2027-12-01'::date, interval '1 month')::date
+    loop
+        execute format(
+            'create table %I partition of acceso_puerta_log for values from (%L) to (%L)',
+            'acceso_puerta_log_' || to_char(v_mes, 'YYYYMM'), v_mes, (v_mes + interval '1 month')::date);
+    end loop;
+end;
+$$;
+
+create table acceso_puerta_log_default partition of acceso_puerta_log default;
+
+create trigger trg_acceso_log_inmutable
+    before update or delete on acceso_puerta_log
+    for each row execute function trg_audit_inmutable();
+
+create table reembolso (
+    id bigint generated always as identity primary key,
+    boleto_id bigint not null references boleto(id) on delete restrict,
+    orden_id bigint not null references orden(id) on delete restrict,
+    admin_id bigint not null references usuario(id) on delete restrict,
+    monto numeric(12,2) not null,
+    forzado boolean not null default false,
+    motivo varchar(300) not null,
+    creado_en timestamptz not null default now(),
+    constraint uq_reembolso_boleto unique (boleto_id),
+    constraint ck_reembolso_monto check (monto >= 0)
+);
+
+create index idx_reembolso_orden on reembolso (orden_id);
+create index idx_reembolso_admin on reembolso (admin_id, creado_en);

@@ -2,16 +2,99 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
 <body>
 <main>
-  <h1>Bitácora de auditoría</h1>
+  <h1>Auditoría y reembolsos</h1>
   <div id="msg" class="msg" hidden></div>
-  <div class="card"><table><thead><tr><th>Fecha</th><th>Usuario</th><th>Rol</th><th>Operación</th><th>IP</th></tr></thead><tbody id="filas"></tbody></table></div>
-  <div class="todo"><strong>TODO (Brandon):</strong> reembolsos/anulaciones (POST /api/seguridad/reembolsos) y la consulta #4 agrupada por administrador.</div>
+
+  <div class="card">
+    <h2>Resumen del último mes por administrador</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Administrador</th><th>Total</th><th>Cortesías</th><th>Reembolsos forzados</th><th>Otras</th><th>Última operación</th></tr></thead>
+      <tbody id="resumen"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Reembolso o anulación de una entrada</h2>
+    <div class="row">
+      <label>Código QR o ID del boleto <input id="buscar" size="30" placeholder="ej. IMAX-MOCK-0001"></label>
+      <button id="btn-buscar" class="secondary">Buscar</button>
+    </div>
+    <div id="boleto" hidden>
+      <table>
+        <tbody>
+          <tr><th>Película</th><td id="b-titulo"></td><th>Función</th><td id="b-inicio"></td></tr>
+          <tr><th>Asiento</th><td id="b-asiento"></td><th>Estado</th><td id="b-estado"></td></tr>
+          <tr><th>Monto a devolver</th><td id="b-monto"></td><th></th><td></td></tr>
+        </tbody>
+      </table>
+      <div class="row">
+        <label>Motivo (obligatorio) <input id="motivo" size="50" placeholder="ej. Función cancelada por falla técnica"></label>
+        <button id="btn-reembolsar" class="danger">Reembolsar</button>
+      </div>
+    </div>
+    <div id="msg-reembolso" class="msg" hidden></div>
+  </div>
+
+  <div class="card">
+    <h2>Bitácora de operaciones administrativas</h2>
+    <table>
+      <thead><tr><th>Fecha</th><th>Usuario</th><th>Rol</th><th>Operación</th><th>IP</th><th>Motivo</th></tr></thead>
+      <tbody id="filas"></tbody>
+    </table>
+  </div>
 </main>
 <script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required" data-roles="administrador"></script>
 <script>
-  api('/seguridad/auditoria').then(rows => {
-    document.getElementById('filas').innerHTML = rows.map(r =>
-      `<tr><td>${fmtFecha(r.fecha)}</td><td>${r.usuario_id}</td><td>${r.rol}</td><td>${r.operacion}</td><td>${r.ip}</td></tr>`).join('');
-  }).catch(e => mostrarMensaje(document.getElementById('msg'), e.message, 'err'));
+  // RN-19 y RN-20. La política de reembolso y el registro de la auditoría los aplica la BD (fn_reembolsar).
+  const msg = document.getElementById('msg');
+  const msgReembolso = document.getElementById('msg-reembolso');
+  let boleto = null;
+
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  async function cargar() {
+    const [resumen, bitacora] = await Promise.all([api('/seguridad/auditoria/resumen'), api('/seguridad/auditoria')]);
+    document.getElementById('resumen').innerHTML = resumen.length ? resumen.map(r =>
+      `<tr><td>${r.usuario_id}</td><td>${esc(r.administrador)}</td><td>${r.total_operaciones}</td><td>${r.cortesias}</td>` +
+      `<td>${r.reembolsos_forzados}</td><td>${r.otras_modificaciones}</td><td>${fmtFecha(r.ultima_operacion)}</td></tr>`).join('')
+      : '<tr><td colspan="7" class="muted">Sin operaciones en el último mes</td></tr>';
+    document.getElementById('filas').innerHTML = bitacora.map(r =>
+      `<tr><td>${fmtFecha(r.fecha)}</td><td>${esc(r.usuario)}</td><td>${esc(r.rol)}</td><td>${esc(r.operacion)}</td>` +
+      `<td>${esc(r.ip)}</td><td>${esc(r.motivo)}</td></tr>`).join('');
+  }
+
+  document.getElementById('btn-buscar').onclick = async () => {
+    msgReembolso.hidden = true;
+    boleto = null;
+    document.getElementById('boleto').hidden = true;
+    const q = document.getElementById('buscar').value.trim();
+    if (!q) return;
+    try {
+      boleto = await api('/seguridad/boletos?q=' + encodeURIComponent(q));
+      document.getElementById('b-titulo').textContent = boleto.titulo;
+      document.getElementById('b-inicio').textContent = fmtFecha(boleto.inicio);
+      document.getElementById('b-asiento').textContent = boleto.asiento;
+      document.getElementById('b-estado').textContent = boleto.estado;
+      document.getElementById('b-monto').textContent = Number(boleto.monto).toFixed(2);
+      document.getElementById('btn-reembolsar').disabled = boleto.estado !== 'EMITIDO';
+      document.getElementById('boleto').hidden = false;
+    } catch (e) { mostrarMensaje(msgReembolso, e.message, 'err'); }
+  };
+
+  document.getElementById('btn-reembolsar').onclick = async () => {
+    const motivo = document.getElementById('motivo').value.trim();
+    try {
+      const r = await api('/seguridad/reembolsos', { method: 'POST', body: { boleto_id: boleto.id, motivo } });
+      mostrarMensaje(msgReembolso, r.mensaje, r.ok ? 'ok' : 'err');
+      if (r.ok) {
+        document.getElementById('b-estado').textContent = 'ANULADO';
+        document.getElementById('btn-reembolsar').disabled = true;
+        document.getElementById('motivo').value = '';
+        cargar().catch(() => {});
+      }
+    } catch (e) { mostrarMensaje(msgReembolso, e.message, 'err'); }
+  };
+
+  cargar().catch(e => mostrarMensaje(msg, e.message, 'err'));
 </script>
 </body></html>
