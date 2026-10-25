@@ -106,3 +106,50 @@ Bitácora de las operaciones manuales de los administradores (RN-20).
 | detalle | jsonb | Datos adicionales de la operación |
 
 Está particionada por mes (de octubre de 2026 a diciembre de 2027, más una partición por defecto). Un disparador rechaza cualquier `UPDATE` o `DELETE`, y los roles de la aplicación no tienen esos permisos sobre la tabla. Los registros se conservan 5 años, según se describe en `05-operacion.md`.
+
+## 4. Relaciones con los demás módulos
+
+| Tabla de este módulo | Se relaciona con | Módulo |
+|---|---|---|
+| puerta | sala | Catálogo |
+| reembolso | boleto, orden | Venta |
+| acceso_puerta_log | boleto, puerta (sin clave foránea, por el motivo ya explicado) | Venta |
+| usuario_rol, admin_operacion_audit | usuario, rol | Seguridad |
+
+## 5. Funciones y disparadores
+
+| Función | Qué hace |
+|---|---|
+| fn_registrar_usuario | Crea un usuario con la contraseña cifrada con bcrypt y le asigna un rol |
+| fn_autenticar | Verifica correo y contraseña; bloquea la cuenta 15 minutos tras 5 intentos fallidos |
+| fn_validar_entrada | Valida el código QR en puerta: estado, función, sala y ventana de ingreso; bloquea la fila del boleto para que dos lecturas simultáneas se atiendan en orden |
+| fn_reembolsar | Anula el boleto, libera el asiento, registra el reembolso y la auditoría; marca como forzado lo que ocurre a menos de 2 horas de la función |
+| fn_registrar_auditoria | Inserta una operación manual en la bitácora con el rol y la IP |
+| trg_audit_inmutable | Impide modificar o borrar las bitácoras |
+
+## 6. Índices
+
+| Índice | Tabla | Para qué sirve |
+|---|---|---|
+| uq_usuario_email | usuario (lower(email)) | Login y unicidad del correo |
+| idx_puerta_sala | puerta | Buscar las puertas de una sala |
+| idx_acceso_log_boleto | acceso_puerta_log (boleto_id, fecha) | Historial de lecturas de un boleto |
+| idx_acceso_log_puerta | acceso_puerta_log (puerta_id, fecha) | Lecturas por puerta |
+| idx_reembolso_orden | reembolso | Reembolsos de una orden |
+| idx_reembolso_admin | reembolso (admin_id, creado_en) | Reembolsos por administrador |
+| idx_admin_audit_usuario | admin_operacion_audit (usuario_id, creado_en) | Operaciones de un administrador |
+| idx_admin_audit_fecha | admin_operacion_audit (creado_en) | Consultas por rango de fechas |
+
+En la consulta de las operaciones de un administrador en la última semana, el índice `idx_admin_audit_usuario` cambió el plan de `Seq Scan` a `Bitmap Index Scan` y bajó el tiempo de 31 ms a 2,8 ms, sobre 300 000 filas (`database/explain/04_explain_auditoria.sql`).
+
+## 7. Reglas de negocio cubiertas
+
+| Regla | Cómo se garantiza |
+|---|---|
+| RN-09 | No existe ninguna columna de tarjeta ni CVV; la contraseña solo se guarda como hash bcrypt |
+| RN-14 | `fn_validar_entrada` cambia el estado del boleto a `USADO` bajo bloqueo de fila; una segunda lectura recibe "Entrada ya utilizada" |
+| RN-15 | Se rechaza si la función no está activa o si la sala de la puerta no coincide con la de la entrada |
+| RN-16 | Ingreso permitido desde 30 minutos antes hasta 15 minutos después del inicio |
+| RN-17 | Roles de PostgreSQL con privilegios mínimos (`08_roles_permisos.sql`) y validación del rol en el servidor |
+| RN-19 | Reembolso solo por un administrador, con motivo, y liberando el asiento; fuera de política queda como forzado |
+| RN-20 | `admin_operacion_audit` guarda fecha, hora, IP, rol y usuario; es inalterable y se conserva 5 años |
