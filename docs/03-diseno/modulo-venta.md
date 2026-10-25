@@ -15,7 +15,7 @@ Reglas de negocio que cubre: RN-03, RN-04, RN-05, RN-08 (con el cálculo del mó
 
 Tablas del módulo con sus columnas, y las tablas de otros módulos con las que se relacionan (`usuario`, `funcion`, `asiento`, `tipo_entrada`). Las líneas punteadas son las bitácoras, que guardan los ids sin llave foránea.
 
-![DER de venta](../img/der-venta.png)
+![DER de venta](../imagenes/der-venta.png)
 
 ```mermaid
 erDiagram

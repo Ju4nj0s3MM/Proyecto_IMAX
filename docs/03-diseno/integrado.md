@@ -25,7 +25,7 @@ La base tiene **26 tablas** en PostgreSQL 16. Los módulos se cargan en este ord
 
 El diagrama se generó leyendo la base ya creada (llaves primarias y foráneas reales), así que coincide con el DDL. Para que se pueda leer solo se muestran las llaves; las columnas completas de la venta están en [modulo-venta.md](modulo-venta.md) y las del catálogo en [modulo-catalogo.md](modulo-catalogo.md).
 
-![DER integrado](../img/der-integrado.png)
+![DER integrado](../imagenes/der-integrado.png)
 
 Las líneas punteadas son las bitácoras (`asiento_auditoria_log`, `transaccion_log` y `acceso_puerta_log`). Se relacionan con las demás tablas por el id guardado, pero **sin llave foránea**, a propósito: son tablas particionadas por mes, solo admiten INSERT, y una llave foránea hacia ellas encarecería cada escritura. Guardan el id tal como estaba cuando ocurrió el evento.
 
