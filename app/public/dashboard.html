@@ -1,12 +1,113 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><title>IMAX · Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css"></head>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/css/styles.css">
+<style>
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:16px; }
+  .kpi { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .kpi b { display:block; font-size:1.7rem; }
+  .kpi span { color:var(--muted); font-size:.85rem; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; }
+  .barra { height:8px; background:var(--line); border-radius:4px; overflow:hidden; min-width:80px; }
+  .barra i { display:block; height:100%; background:var(--accent); }
+  .card h2 { font-size:1.05rem; margin:0 0 10px; }
+  .pendiente { color:var(--muted); font-style:italic; }
+  td.num, th.num { text-align:right; }
+</style></head>
 <body>
 <main>
-  <h1>Dashboard</h1>
-  <div class="todo">
-    <strong>TODO (Mati, con las consultas de cada dueño):</strong> % de ocupación e ingresos por función (<code>/api/venta/reportes/ocupacion</code>),
-    métodos de pago (<code>/api/venta/reportes/metodos-pago</code>), top 5 (<code>/api/catalogo/reportes/top5</code>) y auditoría (<code>/api/seguridad/auditoria</code>).
+  <div class="row" style="justify-content:space-between;margin-bottom:16px">
+    <h1 style="margin:0">Dashboard</h1>
+    <span class="muted">Actualizado: <span id="hora">—</span> · se refresca cada 30 s
+      <button class="secondary" id="refrescar">Actualizar</button></span>
+  </div>
+  <div id="msg" class="msg" hidden></div>
+
+  <!-- Indicadores del catálogo -->
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Top 5 de la semana</h2>
+      <div id="top5"></div>
+    </div>
+    <div class="card">
+      <h2>Métodos de pago</h2>
+      <div id="metodos"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ocupación e ingresos por función</h2>
+    <div id="ocupacion"></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <h2>Próximas funciones</h2>
+      <a class="btn" id="irAdmin" href="/catalogo/admin.html" hidden>Programar funciones y salas</a>
+    </div>
+    <div id="proximas"></div>
   </div>
 </main>
 <script src="/js/api.js"></script><script src="/js/nav.js" data-auth="required" data-roles="contador,administrador"></script>
+<script>
+// MÓDULO A · Mati — Dashboard con métricas en tiempo real.
+// Top 5 y próximas funciones: /api/catalogo/reportes/*. Ocupación y métodos de pago: /api/venta/reportes/* (módulo B).
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const num = v => Number(v).toLocaleString('es-CR', { maximumFractionDigits: 2 });
+const TITULOS = { titulo: 'Título', porcentaje_semana: '% de la semana', metodo: 'Método', funcion: 'Función' };
+const nombreCol = k => TITULOS[k] || k.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+
+// Tabla genérica: muestra las columnas que devuelva la consulta.
+// Si una columna se llama porcentaje..., dibuja una barra.
+function tabla(filas) {
+  if (!filas.length) return '<p class="muted">Sin datos.</p>';
+  const cols = Object.keys(filas[0]).filter(c => !c.endsWith('_id'));
+  return `<table><thead><tr>${cols.map(c => `<th class="${typeof filas[0][c] === 'number' ? 'num' : ''}">${esc(nombreCol(c))}</th>`).join('')}</tr></thead><tbody>` +
+    filas.map(f => '<tr>' + cols.map(c => {
+      const v = f[c];
+      if (c.startsWith('porcentaje')) return `<td><div class="row" style="align-items:center;flex-wrap:nowrap;white-space:nowrap"><div class="barra"><i style="width:${Math.min(100, Number(v))}%"></i></div>${num(v)} %</div></td>`;
+      if (c === 'inicio' || c.endsWith('_en')) return `<td>${fmtFecha(v)}</td>`;
+      if (v !== null && v !== '' && !isNaN(v)) return `<td class="num">${num(v)}</td>`;
+      return `<td>${esc(v)}</td>`;
+    }).join('') + '</tr>').join('') + '</tbody></table>';
+}
+
+// Carga una sección; si el endpoint todavía no existe (501), lo indica sin romper el resto.
+async function seccion(id, ruta, pintar = tabla) {
+  const el = document.getElementById(id);
+  try {
+    el.innerHTML = pintar(await api(ruta));
+  } catch (e) {
+    el.innerHTML = e.status === 501
+      ? `<p class="pendiente">Pendiente: ${esc(e.message)}</p>`
+      : `<p class="msg err">${esc(e.message)}</p>`;
+  }
+}
+
+function resumen(r) {
+  const k = r.indicadores;
+  document.getElementById('kpis').innerHTML = [
+    ['Cines activos', k.cines], ['Salas activas', k.salas], ['Películas en cartelera', k.peliculas_activas],
+    ['Funciones próximas 24 h', k.funciones_24h], ['Funciones próximos 7 días', k.funciones_7d]
+  ].map(([t, v]) => `<div class="kpi"><b>${num(v)}</b><span>${t}</span></div>`).join('');
+  return tabla(r.proximas);
+}
+
+async function cargar() {
+  await Promise.all([
+    seccion('proximas', '/catalogo/reportes/resumen', resumen),
+    seccion('top5', '/catalogo/reportes/top5'),
+    seccion('ocupacion', '/venta/reportes/ocupacion'),
+    seccion('metodos', '/venta/reportes/metodos-pago')
+  ]);
+  document.getElementById('hora').textContent = new Date().toLocaleTimeString('es-CR');
+}
+
+document.getElementById('refrescar').onclick = cargar;
+// el botón de programación solo para administradores (el contador solo consulta)
+setTimeout(() => { if (window.currentUser?.roles.includes('administrador')) document.getElementById('irAdmin').hidden = false; }, 500);
+cargar();
+setInterval(cargar, 30000);
+</script>
 </body></html>
