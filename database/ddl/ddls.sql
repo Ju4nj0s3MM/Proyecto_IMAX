@@ -1,3 +1,4 @@
+\encoding UTF8
 -- 01 DDL completo: tablas, funciones, triggers, roles e índices
 -- Unión de los scripts de database/ en el orden de ejecución. Los archivos originales siguen en sus carpetas.
 

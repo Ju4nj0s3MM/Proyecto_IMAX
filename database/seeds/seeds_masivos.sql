@@ -1,3 +1,4 @@
+\encoding UTF8
 -- 04 Datos masivos para EXPLAIN ANALYZE (tarda varios minutos)
 -- Unión de los scripts de database/ en el orden de ejecución. Los archivos originales siguen en sus carpetas.
 

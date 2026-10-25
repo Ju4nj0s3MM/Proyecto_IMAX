@@ -1,3 +1,4 @@
+\encoding UTF8
 -- 04 Pruebas del proyecto
 -- Cada grupo de pruebas se corre en una base nueva, copiada de imax_base (DDL + seed del catálogo),
 -- porque las pruebas usan ids fijos y no se pueden mezclar entre sí.
@@ -9,10 +10,12 @@
 \pset pager off
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 drop database if exists imax_base;
 create database imax_base;
 \c imax_base
+\encoding UTF8
 
 -- 01 DDL completo: tablas, funciones, triggers, roles e índices
 -- Unión de los scripts de database/ en el orden de ejecución. Los archivos originales siguen en sus carpetas.
@@ -1575,9 +1578,11 @@ select u.id, r.id
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: restricciones del módulo de venta ################'
 
@@ -1776,9 +1781,11 @@ order by 1, 2;
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: fn_liberar_expirados ################'
 
@@ -1835,9 +1842,11 @@ select fn_liberar_expirados();
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: fn_mapa_asientos ################'
 
@@ -1888,9 +1897,11 @@ group by f.id;
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: fn_bloquear_asientos ################'
 
@@ -1953,9 +1964,11 @@ select tipo, resultado, detalle from transaccion_log order by id;
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: fn_asignar_tipos ################'
 
@@ -2009,9 +2022,11 @@ select * from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: fn_confirmar_pago ################'
 
@@ -2088,9 +2103,11 @@ select tipo, resultado from transaccion_log where tipo in ('PAGO', 'EMISION_BOLE
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: seed de venta y consultas analíticas ################'
 
@@ -2183,9 +2200,11 @@ insert into metodo_pago (codigo, nombre) values ('PRUEBA', 'Método de prueba');
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: fn_mis_boletos ################'
 
@@ -2226,9 +2245,11 @@ select resultado_pago from fn_confirmar_pago(3, 1, 'TARJETA_SIMULADA', 'RECHAZAD
 select count(*) from fn_mis_boletos(1);
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: catálogo, total y RN-18 ################'
 
@@ -2375,9 +2396,11 @@ rollback;
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: check-in y reembolsos ################'
 
@@ -2498,9 +2521,11 @@ delete from acceso_puerta_log;
 rollback;
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 create database imax_prueba template imax_base;
 \c imax_prueba
+\encoding UTF8
 \echo
 \echo '################ Pruebas: permisos por rol ################'
 
@@ -2559,6 +2584,7 @@ reset role;
 
 
 \c postgres
+\encoding UTF8
 drop database if exists imax_prueba;
 drop database if exists imax_base;
 \echo

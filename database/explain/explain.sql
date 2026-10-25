@@ -1,3 +1,4 @@
+\encoding UTF8
 -- 05 EXPLAIN ANALYZE de las consultas (correr después de 04_seeds_masivos.sql)
 -- Unión de los scripts de database/ en el orden de ejecución. Los archivos originales siguen en sus carpetas.
 

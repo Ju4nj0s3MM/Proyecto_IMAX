@@ -1,3 +1,4 @@
+\encoding UTF8
 -- 02 Datos de demostración (catálogo, seguridad, métodos de pago y ventas)
 -- Unión de los scripts de database/ en el orden de ejecución. Los archivos originales siguen en sus carpetas.
 

@@ -1,3 +1,4 @@
+\encoding UTF8
 -- 03 Consultas analíticas del negocio
 -- Unión de los scripts de database/ en el orden de ejecución. Los archivos originales siguen en sus carpetas.
 
