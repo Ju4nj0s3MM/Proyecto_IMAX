@@ -1,0 +1,294 @@
+Pager usage is off.
+Timing is on.
+===== 1. Cartelera sin filtros (próximos 7 días)
+                                                                                             QUERY PLAN                                                                                             
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Subquery Scan on "*SELECT*"  (cost=82640.51..82672.25 rows=12696 width=292) (actual time=319.571..338.326 rows=51458 loops=1)
+   Buffers: shared hit=172790, temp read=1111 written=1113
+   ->  Sort  (cost=82640.51..82672.25 rows=12696 width=274) (actual time=319.566..331.285 rows=51458 loops=1)
+         Sort Key: f.inicio, p.titulo
+         Sort Method: external merge  Disk: 8888kB
+         Buffers: shared hit=172790, temp read=1111 written=1113
+         ->  Hash Join  (cost=291.24..81775.14 rows=12696 width=274) (actual time=1.804..257.052 rows=51458 loops=1)
+               Hash Cond: (s.cine_id = ci.id)
+               Buffers: shared hit=172784
+               ->  Hash Join  (cost=280.43..12315.15 rows=12696 width=624) (actual time=1.613..45.973 rows=51458 loops=1)
+                     Hash Cond: (f.sala_id = s.id)
+                     Buffers: shared hit=970
+                     ->  Hash Join  (cost=231.59..12232.89 rows=12696 width=617) (actual time=1.274..34.550 rows=51458 loops=1)
+                           Hash Cond: (p.clasificacion_id = c.id)
+                           Buffers: shared hit=955
+                           ->  Hash Join  (cost=230.50..12163.17 rows=12696 width=622) (actual time=1.256..24.643 rows=51458 loops=1)
+                                 Hash Cond: (f.pelicula_id = p.id)
+                                 Buffers: shared hit=954
+                                 ->  Bitmap Heap Scan on funcion f  (cost=210.18..12109.24 rows=12696 width=40) (actual time=1.084..10.392 rows=51458 loops=1)
+                                       Recheck Cond: ((inicio > now()) AND (inicio >= COALESCE(now())) AND (inicio < COALESCE((now() + '7 days'::interval))) AND ((estado)::text = 'Activa'::text))
+                                       Heap Blocks: exact=896
+                                       Buffers: shared hit=945
+                                       ->  Bitmap Index Scan on idx_funcion_activa_inicio  (cost=0.00..207.00 rows=12696 width=0) (actual time=0.997..0.997 rows=51458 loops=1)
+                                             Index Cond: ((inicio > now()) AND (inicio >= COALESCE(now())) AND (inicio < COALESCE((now() + '7 days'::interval))))
+                                             Buffers: shared hit=49
+                                 ->  Hash  (cost=14.03..14.03 rows=503 width=590) (actual time=0.158..0.160 rows=503 loops=1)
+                                       Buckets: 1024  Batches: 1  Memory Usage: 64kB
+                                       Buffers: shared hit=9
+                                       ->  Seq Scan on pelicula p  (cost=0.00..14.03 rows=503 width=590) (actual time=0.004..0.065 rows=503 loops=1)
+                                             Filter: activa
+                                             Buffers: shared hit=9
+                           ->  Hash  (cost=1.04..1.04 rows=4 width=11) (actual time=0.006..0.007 rows=4 loops=1)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                 Buffers: shared hit=1
+                                 ->  Seq Scan on clasificacion c  (cost=0.00..1.04 rows=4 width=11) (actual time=0.004..0.004 rows=4 loops=1)
+                                       Buffers: shared hit=1
+                     ->  Hash  (cost=30.04..30.04 rows=1504 width=23) (actual time=0.327..0.328 rows=1504 loops=1)
+                           Buckets: 2048  Batches: 1  Memory Usage: 99kB
+                           Buffers: shared hit=15
+                           ->  Seq Scan on sala s  (cost=0.00..30.04 rows=1504 width=23) (actual time=0.005..0.154 rows=1504 loops=1)
+                                 Filter: activa
+                                 Buffers: shared hit=15
+               ->  Hash  (cost=7.03..7.03 rows=303 width=51) (actual time=0.119..0.120 rows=303 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 35kB
+                     Buffers: shared hit=4
+                     ->  Seq Scan on cine ci  (cost=0.00..7.03 rows=303 width=51) (actual time=0.009..0.048 rows=303 loops=1)
+                           Filter: activo
+                           Buffers: shared hit=4
+               SubPlan 1
+                 ->  Aggregate  (cost=5.45..5.46 rows=1 width=32) (actual time=0.003..0.003 rows=1 loops=51458)
+                       Buffers: shared hit=171810
+                       ->  Sort  (cost=5.44..5.44 rows=1 width=10) (actual time=0.003..0.003 rows=1 loops=51458)
+                             Sort Key: g.nombre
+                             Sort Method: quicksort  Memory: 25kB
+                             Buffers: shared hit=171810
+                             ->  Nested Loop  (cost=0.28..5.43 rows=1 width=10) (actual time=0.002..0.002 rows=1 loops=51458)
+                                   Join Filter: (pg.genero_id = g.id)
+                                   Rows Removed by Join Filter: 4
+                                   Buffers: shared hit=171810
+                                   ->  Index Only Scan using pelicula_genero_pkey on pelicula_genero pg  (cost=0.28..4.29 rows=1 width=8) (actual time=0.001..0.001 rows=1 loops=51458)
+                                         Index Cond: (pelicula_id = p.id)
+                                         Heap Fetches: 0
+                                         Buffers: shared hit=102917
+                                   ->  Seq Scan on genero g  (cost=0.00..1.06 rows=6 width=18) (actual time=0.000..0.000 rows=4 loops=68893)
+                                         Buffers: shared hit=68893
+ Planning:
+   Buffers: shared hit=1370
+ Planning Time: 3.232 ms
+ Execution Time: 341.817 ms
+(69 rows)
+
+Time: 346.023 ms
+===== 2. Cartelera por ciudad y fecha
+                                                                                                                                                                                          QUERY PLAN                                                                                                                                                                                          
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Subquery Scan on "*SELECT*"  (cost=5257.13..5257.51 rows=153 width=292) (actual time=7.530..7.670 rows=750 loops=1)
+   Buffers: shared hit=5155
+   ->  Sort  (cost=5257.13..5257.51 rows=153 width=274) (actual time=7.527..7.564 rows=750 loops=1)
+         Sort Key: f.inicio, p.titulo
+         Sort Method: quicksort  Memory: 158kB
+         Buffers: shared hit=5155
+         ->  Nested Loop  (cost=73.24..5251.58 rows=153 width=274) (actual time=0.812..6.965 rows=750 loops=1)
+               Buffers: shared hit=5155
+               ->  Nested Loop  (cost=73.10..4410.74 rows=153 width=664) (actual time=0.772..3.714 rows=750 loops=1)
+                     Buffers: shared hit=2656
+                     ->  Hash Join  (cost=72.83..4361.22 rows=153 width=82) (actual time=0.761..2.746 rows=750 loops=1)
+                           Hash Cond: (f.sala_id = s.id)
+                           Buffers: shared hit=406
+                           ->  Bitmap Heap Scan on funcion f  (cost=28.00..4309.08 rows=1543 width=40) (actual time=0.193..1.491 rows=7350 loops=1)
+                                 Recheck Cond: ((inicio > now()) AND (inicio >= COALESCE((((CURRENT_DATE + 3))::timestamp without time zone AT TIME ZONE 'America/Costa_Rica'::text), now())) AND (inicio < COALESCE(((((CURRENT_DATE + 3) + 1))::timestamp without time zone AT TIME ZONE 'America/Costa_Rica'::text), (now() + '7 days'::interval))) AND ((estado)::text = 'Activa'::text))
+                                 Heap Blocks: exact=379
+                                 Buffers: shared hit=387
+                                 ->  Bitmap Index Scan on idx_funcion_activa_inicio  (cost=0.00..27.62 rows=1543 width=0) (actual time=0.157..0.157 rows=7350 loops=1)
+                                       Index Cond: ((inicio > now()) AND (inicio >= COALESCE((((CURRENT_DATE + 3))::timestamp without time zone AT TIME ZONE 'America/Costa_Rica'::text), now())) AND (inicio < COALESCE(((((CURRENT_DATE + 3) + 1))::timestamp without time zone AT TIME ZONE 'America/Costa_Rica'::text), (now() + '7 days'::interval))))
+                                       Buffers: shared hit=8
+                           ->  Hash  (cost=42.96..42.96 rows=149 width=58) (actual time=0.534..0.538 rows=150 loops=1)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 21kB
+                                 Buffers: shared hit=19
+                                 ->  Hash Join  (cost=8.92..42.96 rows=149 width=58) (actual time=0.273..0.511 rows=150 loops=1)
+                                       Hash Cond: (s.cine_id = ci.id)
+                                       Buffers: shared hit=19
+                                       ->  Seq Scan on sala s  (cost=0.00..30.04 rows=1504 width=23) (actual time=0.005..0.140 rows=1504 loops=1)
+                                             Filter: activa
+                                             Buffers: shared hit=15
+                                       ->  Hash  (cost=8.54..8.54 rows=30 width=51) (actual time=0.257..0.258 rows=30 loops=1)
+                                             Buckets: 1024  Batches: 1  Memory Usage: 11kB
+                                             Buffers: shared hit=4
+                                             ->  Seq Scan on cine ci  (cost=0.00..8.54 rows=30 width=51) (actual time=0.026..0.249 rows=30 loops=1)
+                                                   Filter: (activo AND (((nombre)::text ~~* '%Tokio%'::text) OR ((ciudad)::text ~~* '%Tokio%'::text)))
+                                                   Rows Removed by Filter: 273
+                                                   Buffers: shared hit=4
+                     ->  Index Scan using pelicula_pkey on pelicula p  (cost=0.27..0.32 rows=1 width=590) (actual time=0.001..0.001 rows=1 loops=750)
+                           Index Cond: (id = f.pelicula_id)
+                           Filter: activa
+                           Buffers: shared hit=2250
+               ->  Memoize  (cost=0.14..0.18 rows=1 width=11) (actual time=0.000..0.000 rows=1 loops=750)
+                     Cache Key: p.clasificacion_id
+                     Cache Mode: logical
+                     Hits: 746  Misses: 4  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                     Buffers: shared hit=8
+                     ->  Index Scan using clasificacion_pkey on clasificacion c  (cost=0.13..0.17 rows=1 width=11) (actual time=0.001..0.002 rows=1 loops=4)
+                           Index Cond: (id = p.clasificacion_id)
+                           Buffers: shared hit=8
+               SubPlan 1
+                 ->  Aggregate  (cost=5.45..5.46 rows=1 width=32) (actual time=0.003..0.003 rows=1 loops=750)
+                       Buffers: shared hit=2491
+                       ->  Sort  (cost=5.44..5.44 rows=1 width=10) (actual time=0.003..0.003 rows=1 loops=750)
+                             Sort Key: g.nombre
+                             Sort Method: quicksort  Memory: 25kB
+                             Buffers: shared hit=2491
+                             ->  Nested Loop  (cost=0.28..5.43 rows=1 width=10) (actual time=0.002..0.002 rows=1 loops=750)
+                                   Join Filter: (pg.genero_id = g.id)
+                                   Rows Removed by Join Filter: 3
+                                   Buffers: shared hit=2491
+                                   ->  Index Only Scan using pelicula_genero_pkey on pelicula_genero pg  (cost=0.28..4.29 rows=1 width=8) (actual time=0.001..0.001 rows=1 loops=750)
+                                         Index Cond: (pelicula_id = p.id)
+                                         Heap Fetches: 0
+                                         Buffers: shared hit=1501
+                                   ->  Seq Scan on genero g  (cost=0.00..1.06 rows=6 width=18) (actual time=0.000..0.000 rows=4 loops=990)
+                                         Buffers: shared hit=990
+ Planning:
+   Buffers: shared hit=44
+ Planning Time: 1.263 ms
+ Execution Time: 7.787 ms
+(69 rows)
+
+Time: 9.681 ms
+===== 3. Cartelera por género
+                                                                                             QUERY PLAN                                                                                             
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Subquery Scan on "*SELECT*"  (cost=50175.60..50191.50 rows=6361 width=292) (actual time=113.730..118.098 rows=17177 loops=1)
+   Buffers: shared hit=61229
+   ->  Sort  (cost=50175.60..50191.50 rows=6361 width=274) (actual time=113.726..114.901 rows=17177 loops=1)
+         Sort Key: f.inicio, p.titulo
+         Sort Method: quicksort  Memory: 3620kB
+         Buffers: shared hit=61229
+         ->  Hash Join  (cost=2994.25..49773.74 rows=6361 width=274) (actual time=1.955..97.534 rows=17177 loops=1)
+               Hash Cond: (s.cine_id = ci.id)
+               Buffers: shared hit=61229
+               ->  Hash Join  (cost=2983.43..14967.23 rows=6361 width=624) (actual time=1.811..22.958 rows=17177 loops=1)
+                     Hash Cond: (f.sala_id = s.id)
+                     Buffers: shared hit=976
+                     ->  Hash Join  (cost=2934.59..14901.64 rows=6361 width=617) (actual time=1.452..18.820 rows=17177 loops=1)
+                           Hash Cond: (p.clasificacion_id = c.id)
+                           Buffers: shared hit=961
+                           ->  Hash Join  (cost=2933.50..14866.17 rows=6361 width=622) (actual time=1.442..15.545 rows=17177 loops=1)
+                                 Hash Cond: (f.pelicula_id = p.id)
+                                 Buffers: shared hit=960
+                                 ->  Bitmap Heap Scan on funcion f  (cost=210.18..12109.24 rows=12696 width=40) (actual time=1.201..7.471 rows=51458 loops=1)
+                                       Recheck Cond: ((inicio > now()) AND (inicio >= COALESCE(now())) AND (inicio < COALESCE((now() + '7 days'::interval))) AND ((estado)::text = 'Activa'::text))
+                                       Heap Blocks: exact=896
+                                       Buffers: shared hit=945
+                                       ->  Bitmap Index Scan on idx_funcion_activa_inicio  (cost=0.00..207.00 rows=12696 width=0) (actual time=1.124..1.124 rows=51458 loops=1)
+                                             Index Cond: ((inicio > now()) AND (inicio >= COALESCE(now())) AND (inicio < COALESCE((now() + '7 days'::interval))))
+                                             Buffers: shared hit=49
+                                 ->  Hash  (cost=2720.17..2720.17 rows=252 width=590) (actual time=0.232..0.237 rows=168 loops=1)
+                                       Buckets: 1024  Batches: 1  Memory Usage: 27kB
+                                       Buffers: shared hit=15
+                                       ->  Seq Scan on pelicula p  (cost=0.00..2720.17 rows=252 width=590) (actual time=0.114..0.203 rows=168 loops=1)
+                                             Filter: (activa AND (hashed SubPlan 3))
+                                             Rows Removed by Filter: 335
+                                             Buffers: shared hit=15
+                                             SubPlan 3
+                                               ->  Nested Loop  (cost=5.02..12.61 rows=112 width=8) (actual time=0.034..0.070 rows=168 loops=1)
+                                                     Buffers: shared hit=6
+                                                     ->  Seq Scan on genero g_1  (cost=0.00..1.07 rows=1 width=8) (actual time=0.014..0.016 rows=1 loops=1)
+                                                           Filter: ((nombre)::text ~~* '%Drama%'::text)
+                                                           Rows Removed by Filter: 5
+                                                           Buffers: shared hit=1
+                                                     ->  Bitmap Heap Scan on pelicula_genero pg_1  (cost=5.02..10.42 rows=112 width=16) (actual time=0.016..0.036 rows=168 loops=1)
+                                                           Recheck Cond: (genero_id = g_1.id)
+                                                           Heap Blocks: exact=4
+                                                           Buffers: shared hit=5
+                                                           ->  Bitmap Index Scan on idx_pelicula_genero_genero  (cost=0.00..4.99 rows=112 width=0) (actual time=0.009..0.009 rows=168 loops=1)
+                                                                 Index Cond: (genero_id = g_1.id)
+                                                                 Buffers: shared hit=1
+                           ->  Hash  (cost=1.04..1.04 rows=4 width=11) (actual time=0.005..0.006 rows=4 loops=1)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                 Buffers: shared hit=1
+                                 ->  Seq Scan on clasificacion c  (cost=0.00..1.04 rows=4 width=11) (actual time=0.003..0.004 rows=4 loops=1)
+                                       Buffers: shared hit=1
+                     ->  Hash  (cost=30.04..30.04 rows=1504 width=23) (actual time=0.354..0.355 rows=1504 loops=1)
+                           Buckets: 2048  Batches: 1  Memory Usage: 99kB
+                           Buffers: shared hit=15
+                           ->  Seq Scan on sala s  (cost=0.00..30.04 rows=1504 width=23) (actual time=0.004..0.202 rows=1504 loops=1)
+                                 Filter: activa
+                                 Buffers: shared hit=15
+               ->  Hash  (cost=7.03..7.03 rows=303 width=51) (actual time=0.110..0.111 rows=303 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 35kB
+                     Buffers: shared hit=4
+                     ->  Seq Scan on cine ci  (cost=0.00..7.03 rows=303 width=51) (actual time=0.005..0.054 rows=303 loops=1)
+                           Filter: activo
+                           Buffers: shared hit=4
+               SubPlan 1
+                 ->  Aggregate  (cost=5.45..5.46 rows=1 width=32) (actual time=0.004..0.004 rows=1 loops=17177)
+                       Buffers: shared hit=60249
+                       ->  Sort  (cost=5.44..5.44 rows=1 width=10) (actual time=0.003..0.003 rows=2 loops=17177)
+                             Sort Key: g.nombre
+                             Sort Method: quicksort  Memory: 25kB
+                             Buffers: shared hit=60249
+                             ->  Nested Loop  (cost=0.28..5.43 rows=1 width=10) (actual time=0.002..0.002 rows=2 loops=17177)
+                                   Join Filter: (pg.genero_id = g.id)
+                                   Rows Removed by Join Filter: 6
+                                   Buffers: shared hit=60249
+                                   ->  Index Only Scan using pelicula_genero_pkey on pelicula_genero pg  (cost=0.28..4.29 rows=1 width=8) (actual time=0.001..0.001 rows=2 loops=17177)
+                                         Index Cond: (pelicula_id = p.id)
+                                         Heap Fetches: 0
+                                         Buffers: shared hit=34355
+                                   ->  Seq Scan on genero g  (cost=0.00..1.06 rows=6 width=18) (actual time=0.000..0.000 rows=5 loops=25894)
+                                         Buffers: shared hit=25894
+ Planning:
+   Buffers: shared hit=46
+ Planning Time: 1.026 ms
+ Execution Time: 118.770 ms
+(84 rows)
+
+Time: 120.592 ms
+===== 4. Top 5 de la última semana
+                                                                                                 QUERY PLAN                                                                                                 
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=37023.52..37023.54 rows=5 width=70) (actual time=187.698..190.979 rows=5 loops=1)
+   Buffers: shared hit=6388 read=5192
+   ->  Sort  (cost=37023.52..37024.78 rows=503 width=70) (actual time=187.696..190.976 rows=5 loops=1)
+         Sort Key: (count(*)) DESC, p.titulo
+         Sort Method: top-N heapsort  Memory: 25kB
+         Buffers: shared hit=6388 read=5192
+         ->  WindowAgg  (cost=24803.87..37015.17 rows=503 width=70) (actual time=187.468..190.900 rows=500 loops=1)
+               Buffers: shared hit=6388 read=5192
+               ->  GroupAggregate  (cost=24803.87..37003.85 rows=503 width=38) (actual time=161.569..190.566 rows=500 loops=1)
+                     Group Key: p.id
+                     Buffers: shared hit=6388 read=5192
+                     ->  Gather Merge  (cost=24803.87..36261.02 rows=98373 width=30) (actual time=161.492..183.780 rows=92040 loops=1)
+                           Workers Planned: 2
+                           Workers Launched: 2
+                           Buffers: shared hit=6388 read=5192
+                           ->  Sort  (cost=23803.84..23906.31 rows=40989 width=30) (actual time=155.439..157.398 rows=30680 loops=3)
+                                 Sort Key: p.id, b.funcion_id
+                                 Sort Method: quicksort  Memory: 2479kB
+                                 Buffers: shared hit=6388 read=5192
+                                 Worker 0:  Sort Method: quicksort  Memory: 2071kB
+                                 Worker 1:  Sort Method: quicksort  Memory: 3250kB
+                                 ->  Hash Join  (cost=3735.27..20663.48 rows=40989 width=30) (actual time=17.873..138.798 rows=30680 loops=3)
+                                       Hash Cond: (f.pelicula_id = p.id)
+                                       Buffers: shared hit=6370 read=5192
+                                       ->  Parallel Hash Join  (cost=3714.95..20534.67 rows=40989 width=16) (actual time=16.332..129.146 rows=30680 loops=3)
+                                             Hash Cond: (f.id = b.funcion_id)
+                                             Buffers: shared hit=6245 read=5192
+                                             ->  Parallel Seq Scan on funcion f  (cost=0.00..14758.28 rows=378128 width=16) (actual time=0.018..31.735 rows=302503 loops=3)
+                                                   Buffers: shared hit=5785 read=5192
+                                             ->  Parallel Hash  (cost=3202.59..3202.59 rows=40989 width=8) (actual time=13.590..13.591 rows=30680 loops=3)
+                                                   Buckets: 131072  Batches: 1  Memory Usage: 4672kB
+                                                   Buffers: shared hit=460
+                                                   ->  Parallel Index Only Scan using idx_boleto_emitido on boleto b  (cost=0.43..3202.59 rows=40989 width=8) (actual time=0.041..5.144 rows=30680 loops=3)
+                                                         Index Cond: (emitido_en >= (now() - '7 days'::interval))
+                                                         Filter: ((estado)::text <> 'ANULADO'::text)
+                                                         Heap Fetches: 0
+                                                         Buffers: shared hit=460
+                                       ->  Hash  (cost=14.03..14.03 rows=503 width=22) (actual time=1.484..1.485 rows=503 loops=3)
+                                             Buckets: 1024  Batches: 1  Memory Usage: 35kB
+                                             Buffers: shared hit=27
+                                             ->  Seq Scan on pelicula p  (cost=0.00..14.03 rows=503 width=22) (actual time=0.010..0.067 rows=503 loops=3)
+                                                   Buffers: shared hit=27
+ Planning:
+   Buffers: shared hit=115
+ Planning Time: 0.677 ms
+ Execution Time: 191.057 ms
+(46 rows)
+
+Time: 192.861 ms
