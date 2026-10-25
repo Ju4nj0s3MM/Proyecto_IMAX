@@ -37,6 +37,32 @@ router.get('/reportes/top5', requireRole('administrador', 'contador'), wrap(asyn
      LIMIT 5`));
 }));
 
+// Dashboard: indicadores del catálogo y próximas funciones (lo de venta viene de /venta/reportes/*)
+router.get('/reportes/resumen', requireRole('administrador', 'contador'), wrap(async (req, res) => {
+  if (isMock()) {
+    return res.json({
+      indicadores: { cines: 3, salas: 4, peliculas_activas: 3, funciones_24h: 6, funciones_7d: 8 },
+      proximas: mock.cartelera.map(f => ({ funcion_id: f.funcion_id, titulo: f.titulo, cine: f.cine, sala: f.sala, inicio: f.inicio, capacidad: 80 }))
+    });
+  }
+  const [indicadores] = await call(`
+    SELECT (SELECT count(*) FROM cine WHERE activo) AS cines,
+           (SELECT count(*) FROM sala WHERE activa) AS salas,
+           (SELECT count(*) FROM pelicula WHERE activa) AS peliculas_activas,
+           (SELECT count(*) FROM funcion WHERE estado = 'Activa' AND inicio > now() AND inicio < now() + interval '1 day') AS funciones_24h,
+           (SELECT count(*) FROM funcion WHERE estado = 'Activa' AND inicio > now() AND inicio < now() + interval '7 days') AS funciones_7d`);
+  const proximas = await call(`
+    SELECT f.id AS funcion_id, p.titulo, c.nombre AS cine, s.nombre AS sala, f.inicio, s.capacidad
+      FROM funcion f
+      JOIN pelicula p ON p.id = f.pelicula_id
+      JOIN sala s ON s.id = f.sala_id
+      JOIN cine c ON c.id = s.cine_id
+     WHERE f.estado = 'Activa' AND f.inicio > now()
+     ORDER BY f.inicio
+     LIMIT 10`);
+  res.json({ indicadores, proximas });
+}));
+
 // CRUD de cines, salas, asientos, zonas, clasificaciones, géneros, películas, funciones, tipos de entrada,
 // tarifas y promociones (tablas de 01_catalogo.sql). Ver src/routes/catalogo-admin.js
 router.use('/admin', require('./catalogo-admin'));

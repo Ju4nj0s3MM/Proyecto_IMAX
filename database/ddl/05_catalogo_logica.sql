@@ -1,5 +1,6 @@
 -- Creación de la cartelera, cálculos de los totales y demás reglas de negocio del módulo A
 -- Matías Esquivel Lizano
+-- Se ejecuta después de 03_venta.sql: el trigger RN-18 consulta reserva_asiento y boleto
 
 
 
