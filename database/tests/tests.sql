@@ -2164,8 +2164,8 @@ select resultado, count(*) from pago group by resultado order by resultado;
 select asiento_id, estado from fn_mapa_asientos(1)
 where asiento_id in (1, 2, 10, 11, 12, 20, 21, 30, 31, 40) order by asiento_id;
 
--- Resultado esperado: asiento 50 VENDIDO en la función 2 y DISPONIBLE en la función 1
-select 2 as funcion, estado from fn_mapa_asientos(2) where asiento_id = 50
+-- Resultado esperado: asiento 50 VENDIDO en la función 4 y DISPONIBLE en la función 1
+select 4 as funcion, estado from fn_mapa_asientos(4) where asiento_id = 50
 union all
 select 1, estado from fn_mapa_asientos(1) where asiento_id = 50;
 
