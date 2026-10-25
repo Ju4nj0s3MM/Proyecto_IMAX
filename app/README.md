@@ -12,7 +12,7 @@ npm run dev               # abre http://localhost:3000
 En el login usa **"Entrar como rol"** para probar cada perfil (cliente, taquillero, operador_sala, contador, administrador).
 
 ## Pasar a la BD real
-1. Levantar PostgreSQL y cargar `database/schema.sql` + `database/seed.sql`.
+1. Levantar PostgreSQL y cargar `database/ddl/ddls.sql` + `database/seeds/seeds.sql`
 2. En `.env`: `MOCK=false`, `AUTH_DEV_BYPASS=false` y las variables `PG*`.
 3. Cada ruta llama a la función SQL del contrato (ver tabla). Si la función aún no existe, la ruta devolverá error: es la señal de qué falta.
 
