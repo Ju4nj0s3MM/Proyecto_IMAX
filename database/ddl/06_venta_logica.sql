@@ -278,3 +278,18 @@ begin
                  from boleto b where b.orden_id = p_orden_id order by b.id;
 end $$;
 
+-- Boletos de un usuario, los más próximos primero (RN-13)
+create function fn_mis_boletos(p_usuario_id bigint)
+returns table (boleto_id bigint, codigo_qr varchar, titulo varchar, inicio timestamptz,
+               sala varchar, fila varchar, numero integer, estado varchar)
+language sql stable as $$
+    select b.id, b.codigo_qr, p.titulo, f.inicio, s.nombre, a.fila, a.numero, b.estado
+    from boleto b
+    join orden o on o.id = b.orden_id
+    join funcion f on f.id = b.funcion_id
+    join pelicula p on p.id = f.pelicula_id
+    join sala s on s.id = f.sala_id
+    join asiento a on a.id = b.asiento_id
+    where o.usuario_id = p_usuario_id
+    order by f.inicio desc, a.fila, a.numero;
+$$;

@@ -510,3 +510,39 @@ select count(*) as aprobados from pago where resultado = 'APROBADO';
 -- Resultado esperado: el método nuevo aparece con 0 pagos y 0.00 %; los demás siguen en 33.33 %
 -- (después de insertar, correr de nuevo 21_consulta_metodos_pago.sql)
 insert into metodo_pago (codigo, nombre) values ('PRUEBA', 'Método de prueba');
+
+-- Pruebas de fn_mis_boletos 
+-- Se corre sobre una base nueva con todos los DDL y el seed del catálogo.
+
+insert into metodo_pago (codigo, nombre) values ('TARJETA_SIMULADA', 'Tarjeta simulada');
+
+-- Prueba 1: antes de comprar no hay boletos
+-- Resultado esperado: 0 filas
+select count(*) from fn_mis_boletos(1);
+
+-- El usuario 1 compra 2 asientos; el usuario 2 compra 1
+select * from fn_bloquear_asientos(1, 1, array[1, 2]);
+select total from fn_asignar_tipos(1, 1, array[1, 2], array[1, 1]);
+select resultado_pago from fn_confirmar_pago(1, 1, 'TARJETA_SIMULADA', 'APROBADO');
+select * from fn_bloquear_asientos(2, 1, array[20]);
+select total from fn_asignar_tipos(2, 2, array[20], array[1]);
+select resultado_pago from fn_confirmar_pago(2, 2, 'TARJETA_SIMULADA', 'APROBADO');
+
+-- Prueba 2: el usuario 1 ve sus 2 boletos con película, sala, asiento y estado
+-- Resultado esperado: 2 filas EMITIDO (asientos 1 y 2 de la sala, ver fila y número)
+select boleto_id, codigo_qr, titulo, sala, fila, numero, estado from fn_mis_boletos(1);
+
+-- Prueba 3: el usuario 2 solo ve el suyo
+-- Resultado esperado: 1 fila
+select count(*) from fn_mis_boletos(2);
+
+-- Prueba 4: un usuario sin compras
+-- Resultado esperado: 0 filas
+select count(*) from fn_mis_boletos(3);
+
+-- Prueba 5: un boleto pagado y otro de un pago rechazado
+-- Resultado esperado: el rechazado no genera boleto (el usuario 1 sigue con 2)
+select * from fn_bloquear_asientos(1, 1, array[30]);
+select total from fn_asignar_tipos(3, 1, array[30], array[1]);
+select resultado_pago from fn_confirmar_pago(3, 1, 'TARJETA_SIMULADA', 'RECHAZADO');
+select count(*) from fn_mis_boletos(1);
