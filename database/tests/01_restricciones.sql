@@ -481,3 +481,32 @@ where asiento_id in (1, 2, 10, 11, 12, 20, 21, 30, 31, 40) order by asiento_id;
 select 2 as funcion, estado from fn_mapa_asientos(2) where asiento_id = 50
 union all
 select 1, estado from fn_mapa_asientos(1) where asiento_id = 50;
+
+-- Pruebas de las consultas sobre el seed de venta (10_metodos_pago.sql y 11_seed_venta.sql)
+
+-- Prueba 1 (consulta 1, función 1): ocupación y recaudación
+-- Resultado esperado: 5 asientos vendidos de 80, 6.25 % de ocupación y 57.75 recaudado (órdenes 1 y 2)
+select (select count(*) from boleto b where b.funcion_id = 1 and b.estado <> 'ANULADO') as vendidos,
+       (select sum(total) from orden where funcion_id = 1 and estado = 'PAGADA') as recaudado;
+
+-- Prueba 2: una función sin ventas
+-- Resultado esperado: 0 vendidos, 0.00 % y recaudado 0
+select f.id,
+       (select count(*) from boleto b where b.funcion_id = f.id and b.estado <> 'ANULADO') as vendidos,
+       coalesce((select sum(o.total) from orden o where o.funcion_id = f.id and o.estado = 'PAGADA'), 0) as recaudado
+  from funcion f where f.id = 3;
+
+-- Prueba 3: un boleto anulado deja de contar en la ocupación
+-- Resultado esperado: baja de 5 a 4 vendidos
+update boleto set estado = 'ANULADO' where id = 1;
+select count(*) as vendidos from boleto where funcion_id = 1 and estado <> 'ANULADO';
+update boleto set estado = 'EMITIDO' where id = 1;
+
+-- Prueba 4 (consulta 3): los pagos rechazados no cuentan
+-- Resultado esperado: 3 pagos aprobados en total, 33.33 % cada método
+select count(*) as aprobados from pago where resultado = 'APROBADO';
+
+-- Prueba 5: un método que nadie ha usado sale con cero pagos
+-- Resultado esperado: el método nuevo aparece con 0 pagos y 0.00 %; los demás siguen en 33.33 %
+-- (después de insertar, correr de nuevo 21_consulta_metodos_pago.sql)
+insert into metodo_pago (codigo, nombre) values ('PRUEBA', 'Método de prueba');
