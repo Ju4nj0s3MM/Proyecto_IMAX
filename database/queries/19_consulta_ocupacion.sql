@@ -18,4 +18,4 @@ select f.id as funcion_id,
   from funcion f
   join pelicula p on p.id = f.pelicula_id
   join sala s on s.id = f.sala_id
- where f.id = 1;
+ where f.id = 3;  -- la función 3 es la que tiene las ventas del seed

@@ -98,7 +98,8 @@ select p.id, s.id, ((current_date + x.dias) + x.hora) at time zone 'America/Cost
                ('Dune: Parte Tres', 'Sala 1 IMAX Laser', 2, time '18:00'),
                ('Océano Profundo',  'Sala 2',            2, time '16:00')) x(titulo, sala, dias, hora)
   join pelicula p on p.titulo = x.titulo
-  join sala s on s.nombre = x.sala;
+  join sala s on s.nombre = x.sala
+ order by s.id, x.dias, x.hora;   -- así los ids de las funciones siempre salen en el mismo orden
 
 commit;
 
