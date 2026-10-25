@@ -1,0 +1,132 @@
+Pager usage is off.
+===== Prueba 1: traslape en la misma sala. Esperado: ERROR ex_funcion_sin_traslape
+psql:database/tests/05_catalogo_logica.sql:17: ERROR:  conflicting key value violates exclusion constraint "ex_funcion_sin_traslape"
+DETAIL:  Key (sala_id, tstzrange(inicio, fin_limpieza))=(1, ["2026-10-24 16:00:00-06","2026-10-24 17:10:00-06")) conflicts with existing key (sala_id, tstzrange(inicio, fin_limpieza))=(1, ["2026-10-24 14:00:00-06","2026-10-24 17:10:00-06")).
+===== Prueba 2: reprogramar sobre una función cancelada. Esperado: UPDATE 1 e INSERT 0 1
+BEGIN
+UPDATE 1
+INSERT 0 1
+ROLLBACK
+===== Prueba 3: fin y fin_limpieza calculados por el trigger. Esperado: duración y limpieza correctas
+      titulo      |       sala        | duracion | limpieza 
+------------------+-------------------+----------+----------
+ Dune: Parte Tres | Sala 1 IMAX Laser | 02:45:00 | 00:25:00
+ Océano Profundo  | Sala 1            | 00:45:00 | 00:20:00
+ Dune: Parte Tres | Sala 1 IMAX Laser | 02:45:00 | 00:25:00
+ La Noche Eterna  | Sala Premium      | 01:52:00 | 00:30:00
+ La Noche Eterna  | Sala 1            | 01:52:00 | 00:20:00
+ Océano Profundo  | Sala 1 IMAX Laser | 00:45:00 | 00:25:00
+ Océano Profundo  | Sala 2            | 00:45:00 | 00:20:00
+ Dune: Parte Tres | Sala 1 IMAX Laser | 02:45:00 | 00:25:00
+(8 rows)
+
+===== Prueba 4: asiento repetido en la sala. Esperado: ERROR uq_asiento_sala_fila_numero
+psql:database/tests/05_catalogo_logica.sql:35: ERROR:  duplicate key value violates unique constraint "uq_asiento_sala_fila_numero"
+DETAIL:  Key (sala_id, fila, numero)=(1, A, 1) already exists.
+===== Prueba 5: tarifa repetida. Esperado: ERROR uq_tarifa_combinacion
+psql:database/tests/05_catalogo_logica.sql:39: ERROR:  duplicate key value violates unique constraint "uq_tarifa_combinacion"
+DETAIL:  Key (tipo_entrada_id, zona_asiento_id, COALESCE(dia_semana::integer, 0), hora_desde)=(1, 1, 0, 00:00:00) already exists.
+===== Prueba 6: promoción sin condición. Esperado: ERROR ck_promocion_condicion
+psql:database/tests/05_catalogo_logica.sql:42: ERROR:  new row for relation "promocion" violates check constraint "ck_promocion_condicion"
+DETAIL:  Failing row contains (3, 2x1 sin condición, 2X1, null, f, null, null, null, t).
+===== Prueba 7: cartelera (RN-01, RN-02)
+BEGIN
+INSERT 0 1
+UPDATE 1
+7a. Sin filtros. Esperado: 7 funciones, todas futuras
+      titulo      | clasificacion |         genero          |       cine       |       sala        | futura 
+------------------+---------------+-------------------------+------------------+-------------------+--------
+ Dune: Parte Tres | PG-13         | Acción, Ciencia ficción | IMAX Los Ángeles | Sala 1 IMAX Laser | t
+ Océano Profundo  | G             | Documental              | IMAX San José    | Sala 1            | t
+ Dune: Parte Tres | PG-13         | Acción, Ciencia ficción | IMAX Los Ángeles | Sala 1 IMAX Laser | t
+ La Noche Eterna  | R             | Drama, Terror           | IMAX San José    | Sala 1            | t
+ Océano Profundo  | G             | Documental              | IMAX Los Ángeles | Sala 1 IMAX Laser | t
+ Océano Profundo  | G             | Documental              | IMAX San José    | Sala 2            | t
+ Dune: Parte Tres | PG-13         | Acción, Ciencia ficción | IMAX Los Ángeles | Sala 1 IMAX Laser | t
+(7 rows)
+
+7b. Ciudad San José. Esperado: 3 funciones, todas de IMAX San José
+     titulo      |     cine      |  sala  
+-----------------+---------------+--------
+ Océano Profundo | IMAX San José | Sala 1
+ La Noche Eterna | IMAX San José | Sala 1
+ Océano Profundo | IMAX San José | Sala 2
+(3 rows)
+
+7c. Género Terror. Esperado: solo La Noche Eterna en San José
+     titulo      |    genero     |     cine      
+-----------------+---------------+---------------
+ La Noche Eterna | Drama, Terror | IMAX San José
+(1 row)
+
+7d. Fecha de pasado mañana. Esperado: 2 funciones
+      titulo      |       cine       |         inicio         
+------------------+------------------+------------------------
+ Océano Profundo  | IMAX San José    | 2026-10-25 16:00:00-06
+ Dune: Parte Tres | IMAX Los Ángeles | 2026-10-25 18:00:00-06
+(2 rows)
+
+ROLLBACK
+===== Prueba 8: total de la compra (RN-07, RN-08)
+BEGIN
+INSERT 0 3
+8a. 2 estudiantes en General, sábado. Esperado: 13.00 - 6.50 + 1.50 = 8.00
+ subtotal | descuento | cargo_servicio | total 
+----------+-----------+----------------+-------
+    13.00 |      6.50 |           1.50 |  8.00
+(1 row)
+
+8b. 3 adultos en General, sábado (sin promoción). Esperado: 25.50 - 0 + 2.25 = 27.75
+ subtotal | descuento | cargo_servicio | total 
+----------+-----------+----------------+-------
+    25.50 |      0.00 |           2.25 | 27.75
+(1 row)
+
+8c. 1 adulto martes 11:00: gana la tarifa del martes (6.00) sobre la matiné (7.00). Esperado: 6.75
+ subtotal | descuento | cargo_servicio | total 
+----------+-----------+----------------+-------
+     6.00 |      0.00 |           0.75 |  6.75
+(1 row)
+
+8d. Miércoles 2x1: 2 adultos y 1 adulto mayor. Esperado: 22.50 - 8.50 + 2.25 = 16.25
+ subtotal | descuento | cargo_servicio | total | lineas 
+----------+-----------+----------------+-------+--------
+    22.50 |      8.50 |           2.25 | 16.25 |      3
+(1 row)
+
+8e. Asiento de otra sala. Esperado: ERROR Hay asientos que no pertenecen a la sala de la función
+psql:database/tests/05_catalogo_logica.sql:103: ERROR:  Hay asientos que no pertenecen a la sala de la función
+CONTEXT:  PL/pgSQL function fn_calcular_total(bigint,bigint[],bigint[]) line 32 at RAISE
+ROLLBACK
+===== Prueba 9: RN-18, no modificar una sala con ventas activas
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+9a. Cambiar la zona de una fila. Esperado: ERROR RN-18
+SAVEPOINT
+psql:database/tests/05_catalogo_logica.sql:120: ERROR:  RN-18: la sala 1 tiene entradas vendidas o reservadas para funciones programadas, no se puede modificar su mapa de asientos
+CONTEXT:  PL/pgSQL function trg_asiento_rn18() line 4 at RAISE
+ROLLBACK
+9b. Borrar una fila. Esperado: ERROR RN-18
+psql:database/tests/05_catalogo_logica.sql:123: ERROR:  RN-18: la sala 1 tiene entradas vendidas o reservadas para funciones programadas, no se puede modificar su mapa de asientos
+CONTEXT:  PL/pgSQL function trg_asiento_rn18() line 4 at RAISE
+ROLLBACK
+9c. Agregar un asiento. Esperado: ERROR RN-18
+psql:database/tests/05_catalogo_logica.sql:126: ERROR:  RN-18: la sala 1 tiene entradas vendidas o reservadas para funciones programadas, no se puede modificar su mapa de asientos
+CONTEXT:  PL/pgSQL function trg_asiento_rn18() line 7 at RAISE
+ROLLBACK
+9d. Cambiar la capacidad de la sala. Esperado: ERROR RN-18
+psql:database/tests/05_catalogo_logica.sql:129: ERROR:  RN-18: la sala 1 tiene entradas vendidas o reservadas para funciones programadas, no se puede modificar ni eliminar
+CONTEXT:  PL/pgSQL function trg_sala_rn18() line 4 at RAISE
+ROLLBACK
+9e. Cambiar solo el nombre de la sala (no es la distribución). Esperado: UPDATE 1
+UPDATE 1
+ROLLBACK
+9f. Misma operación en la Sala 1 de San José, sin ventas. Esperado: UPDATE 8
+UPDATE 8
+ROLLBACK
+9g. Si el bloqueo venció, ya no cuenta como reserva. Esperado: UPDATE 1
+UPDATE 1
+UPDATE 1
+ROLLBACK
