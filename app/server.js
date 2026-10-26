@@ -30,6 +30,7 @@ app.use((err, req, res, next) => {
   if (err.code === '23505') { status = 409; message = 'Conflicto: el registro ya existe o el asiento no está disponible'; }
   else if (err.code === 'P0001') { status = 400; }   // RAISE EXCEPTION en PL/pgSQL
   else if (err.code === '42501') { status = 403; message = 'Permiso denegado por la base de datos'; }
+  else if (err.code === '22P02') { status = 400; message = 'Formato inválido: se esperaba un número'; }   // ej. funcion_id = 'abc'
   if (status >= 500) console.error(err);
   res.status(status).json({ error: message });
 });

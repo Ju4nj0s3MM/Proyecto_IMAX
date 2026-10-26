@@ -27,6 +27,8 @@
   }
   document.getElementById('entrar').onclick = () =>
     login({ email: document.getElementById('email').value, password: document.getElementById('password').value });
+  // Enter en el correo o la contraseña también entra
+  for (const id of ['email', 'password']) document.getElementById(id).onkeydown = e => { if (e.key === 'Enter') document.getElementById('entrar').click(); };
   document.getElementById('entrarDev').onclick = () => login({ rol: document.getElementById('rol').value });
   api('/seguridad/config').then(c => {
     if (!c.devBypass) return;

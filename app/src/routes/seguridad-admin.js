@@ -92,9 +92,10 @@ router.use((err, req, res, next) => {
     case '23505': return res.status(409).json({ error: m || 'Ya existe un registro con esos datos.' });
     case '23514': return res.status(400).json({ error: m || 'Algún valor no cumple las reglas de la tabla.' });
     case '23502': return res.status(400).json({ error: `Falta el campo obligatorio: ${err.column}.` });
+    case '23001':   // on delete restrict
     case '23503': {
       const t = /table "(\w+)"/.exec(err.detail || '');
-      if (t && /still referenced/.test(err.detail)) {
+      if (t && /referenced from/.test(err.detail)) {
         return res.status(409).json({ error: `No se puede eliminar: todavía hay ${TABLAS[t[1]] || t[1]}. Quítalo de ellos primero o desactívalo.` });
       }
       return res.status(409).json({ error: 'Hace referencia a un registro que no existe.' });
