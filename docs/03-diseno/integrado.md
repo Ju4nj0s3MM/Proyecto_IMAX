@@ -226,7 +226,7 @@ Las tablas de bitácora llevan la fecha dentro de la llave primaria (`id`, `fech
 - **Salas con ventas no se tocan (RN-18).** Dos triggers del módulo A consultan las órdenes y reservas del módulo B antes de permitir cambios en una sala; por eso `03_venta.sql` se carga antes que `05_catalogo_logica.sql`.
 - **Un boleto es un dato de venta, y el acceso en sala lo consume.** `fn_validar_entrada` (módulo C) lee `boleto.codigo_qr`, `boleto.estado` y `boleto.funcion_id`, y marca el boleto como `USADO`. `fn_reembolsar` lo anula y libera el asiento.
 - **Las contraseñas se guardan con hash.** `usuario.password_hash` se calcula con `crypt()` y `gen_salt('bf')` de pgcrypto; la autenticación pasa por `fn_autenticar`.
-- **Los permisos viven en la base.** `08_roles_permisos.sql` crea un rol de PostgreSQL por cada rol del negocio y le otorga solo lo que necesita (matriz en [rbac-matriz.md](../../Documentos/rbac-matriz.md)).
+- **Los permisos viven en la base.** `08_roles_permisos.sql` crea un rol de PostgreSQL por cada rol del negocio y le otorga solo lo que necesita (matriz en [rbac-matriz.md](../rbac-matriz.md)).
 - **Bitácoras inalterables y con retención.** Las tres bitácoras y la auditoría administrativa se particionan por mes y un trigger rechaza `UPDATE` y `DELETE`. `fn_crear_particiones_mes(fecha)` crea las particiones del mes de esa fecha en las bitácoras de venta, y `fn_liberar_expirados` la llama cada vez que corre para que siempre exista la del mes actual.
 
 ## 5. Datos de demostración y datos masivos

@@ -75,11 +75,11 @@ La propuesta técnica del proveedor saliente fue calificada por el comité evalu
 
 | Fase | Contenido | Documento |
 |---|---|---|
-| **1. Análisis de factibilidad** | Factibilidad técnica, económica y operativa; matriz de riesgos con RTO/RPO; comparativa de proveedores cloud; dimensionamiento de almacenamiento a 5 años | [`01a`](Documentos/01a-factibilidad-tecnica-riesgos.md) · [`01b`](docs/01b-factibilidad-economica.md) · [`01c`](docs/01c-almacenamiento.md) |
+| **1. Análisis de factibilidad** | Factibilidad técnica, económica y operativa; matriz de riesgos con RTO/RPO; comparativa de proveedores cloud; dimensionamiento de almacenamiento a 5 años | [`01a`](docs/01a-factibilidad-tecnica-riesgos.md) · [`01b`](docs/01b-factibilidad-economica.md) · [`01c`](docs/01c-almacenamiento.md) |
 | **2. Requisitos** | Requisitos funcionales y no funcionales; volúmenes esperados | [`02-requisitos`](docs/02-requisitos.md) |
 | **3. Diseño** | Diagrama Entidad-Relación, modelo lógico normalizado, diseño físico, índices y particionamiento | [`03-diseno/`](docs/03-diseno/) |
 | **4. Implementación y pruebas** | Scripts DDL, restricciones, transacciones, triggers, pruebas de concurrencia y rendimiento | [`database/`](database/) · [`04-pruebas/`](docs/04-pruebas/) |
-| **5. Operación y mantenimiento** | Copias de seguridad, recuperación ante desastres, RPO/RTO/SLA, privacidad | [`05-operacion`](Documentos/05-operacion.md) |
+| **5. Operación y mantenimiento** | Copias de seguridad, recuperación ante desastres, RPO/RTO/SLA, privacidad | [`05-operacion`](docs/05-operacion.md) |
 
 ## 4. Arquitectura propuesta
 
@@ -158,7 +158,7 @@ El acceso se rige por el **principio de privilegio mínimo**, implementado con r
 | Contador | Lectura y exportación de información financiera |
 | Administrador / Gerente | Configuración de cartelera, salas y precios; reembolsos; consulta de auditoría |
 
-La matriz completa se documenta en [`Documentos/rbac-matriz.md`](Documentos/rbac-matriz.md).
+La matriz completa se documenta en [`docs/rbac-matriz.md`](docs/rbac-matriz.md).
 
 ## 8. Estructura del repositorio
 
@@ -252,7 +252,7 @@ Lanza 30 clientes que bloquean el mismo asiento a la vez y 10 pagos simultáneos
 | **Doble escaneo de QR y reembolsos** | Entre múltiples lecturas simultáneas, una sola válida; el resto "Entrada ya utilizada" | `database/tests/07_checkin_reembolso.sql`, `database/tests/doble_escaneo.py` |
 | **Rendimiento de consultas** | `EXPLAIN ANALYZE` antes y después de crear índices: de *Seq Scan* a *Index Scan* | [`docs/04-pruebas/venta.md`](docs/04-pruebas/venta.md), [`database/explain/`](database/explain/) |
 | **Consultas analíticas** | Ocupación y recaudación, top 5 semanal, métodos de pago y auditoría, sin errores | [`database/queries/`](database/queries/) |
-| **RBAC** | Roles sin privilegio no pueden modificar salas ni precios | [`Documentos/rbac-matriz.md`](Documentos/rbac-matriz.md), `database/tests/08_permisos_por_rol.sql` |
+| **RBAC** | Roles sin privilegio no pueden modificar salas ni precios | [`docs/rbac-matriz.md`](docs/rbac-matriz.md), `database/tests/08_permisos_por_rol.sql` |
 
 ## 11. Metodología de trabajo
 
@@ -275,7 +275,7 @@ Lanza 30 clientes que bloquean el mismo asiento a la vez y 10 pagos simultáneos
 | Documento | Descripción |
 |---|---|
 | [`DIVISION-DE-TRABAJO.md`](DIVISION-DE-TRABAJO.md) | Contexto completo, reglas de negocio y reparto por módulo |
-| [`Documentos/01a-factibilidad-tecnica-riesgos.md`](Documentos/01a-factibilidad-tecnica-riesgos.md) | Dictamen de rechazo y matriz de riesgos |
+| [`docs/01a-factibilidad-tecnica-riesgos.md`](docs/01a-factibilidad-tecnica-riesgos.md) | Dictamen de rechazo y matriz de riesgos |
 | [`docs/01b-factibilidad-economica.md`](docs/01b-factibilidad-economica.md) | Comparativa cloud, CAPEX/OPEX a 3 años y ROI |
 | [`docs/01c-almacenamiento.md`](docs/01c-almacenamiento.md) | Dimensionamiento de almacenamiento a 5 años |
 | [`docs/02-requisitos.md`](docs/02-requisitos.md) | Requisitos y volúmenes |
@@ -284,8 +284,8 @@ Lanza 30 clientes que bloquean el mismo asiento a la vez y 10 pagos simultáneos
 | [`docs/03-diseno/modulo-venta.md`](docs/03-diseno/modulo-venta.md) | Módulo B: venta, bloqueo de asientos y pago |
 | [`docs/03-diseno/wireframes.md`](docs/03-diseno/wireframes.md) | Bocetos de las pantallas |
 | [`docs/04-pruebas/catalogo.md`](docs/04-pruebas/catalogo.md) y [`venta.md`](docs/04-pruebas/venta.md) | Pruebas y evidencias por módulo |
-| [`Documentos/05-operacion.md`](Documentos/05-operacion.md) | Respaldos, recuperación ante desastres y SLA |
-| [`Documentos/rbac-matriz.md`](Documentos/rbac-matriz.md) | Matriz de roles y permisos |
+| [`docs/05-operacion.md`](docs/05-operacion.md) | Respaldos, recuperación ante desastres y SLA |
+| [`docs/rbac-matriz.md`](docs/rbac-matriz.md) | Matriz de roles y permisos |
 | [`app/README.md`](app/README.md) | Guía de la interfaz web y contrato con la base de datos |
 
 ## 14. Estado del proyecto
