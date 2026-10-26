@@ -88,10 +88,14 @@ router.post('/ordenes/:id/tipos', compra, wrap(async (req, res) => {
 }));
 
 // Consulta analítica 1: ocupación y recaudación de una función (database/queries/19_consulta_ocupacion.sql)
+// Con funcion_id devuelve esa función (pantalla de reportes). Sin él, las funciones activas que no han terminado (dashboard).
 router.get('/reportes/ocupacion', requireRole('administrador', 'contador'), wrap(async (req, res) => {
-  const id = Number(req.query.funcion_id);
-  if (!id) return res.status(400).json({ error: 'Falta funcion_id' });
-  if (isMock()) return res.json({ funcion_id: id, titulo: 'Dune: Parte Tres', capacidad: 80, asientos_vendidos: 5, porcentaje_ocupacion: 6.25, recaudado: 57.75 });
+  const id = req.query.funcion_id ? Number(req.query.funcion_id) : null;
+  if (id !== null && !(Number.isInteger(id) && id > 0)) return res.status(400).json({ error: 'funcion_id no es válido' });
+  if (isMock()) {
+    const fila = { funcion_id: id || 1, titulo: 'Dune: Parte Tres', capacidad: 80, asientos_vendidos: 5, porcentaje_ocupacion: 6.25, recaudado: 57.75 };
+    return res.json(id ? fila : [fila]);
+  }
   const rows = await call(
     `SELECT f.id AS funcion_id, p.titulo, s.nombre AS sala, f.inicio, s.capacidad,
             (SELECT count(*) FROM boleto b WHERE b.funcion_id = f.id AND b.estado <> 'ANULADO') AS asientos_vendidos,
@@ -100,7 +104,10 @@ router.get('/reportes/ocupacion', requireRole('administrador', 'contador'), wrap
        FROM funcion f
        JOIN pelicula p ON p.id = f.pelicula_id
        JOIN sala s ON s.id = f.sala_id
-      WHERE f.id = $1`, [id]);
+      WHERE ($1::bigint IS NOT NULL AND f.id = $1)
+         OR ($1::bigint IS NULL AND f.estado = 'Activa' AND f.fin >= now())
+      ORDER BY f.inicio`, [id]);
+  if (!id) return res.json(rows);
   if (!rows.length) return res.status(404).json({ error: 'La función no existe' });
   res.json(rows[0]);
 }));

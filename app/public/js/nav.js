@@ -18,6 +18,7 @@
     { href: '/venta/mis-entradas.html', txt: 'Mis entradas', roles: ['cliente', 'taquillero', 'administrador'] },
     { href: '/seguridad/checkin.html', txt: 'Check-in', roles: ['operador_sala', 'administrador'] },
     { href: '/dashboard.html', txt: 'Dashboard', roles: ['contador', 'administrador'] },
+    { href: '/venta/reportes.html', txt: 'Reportes', roles: ['contador', 'administrador'] },
     { href: '/catalogo/admin.html', txt: 'Admin catálogo', roles: ['administrador'] },
     { href: '/seguridad/usuarios.html', txt: 'Usuarios', roles: ['administrador'] },
     { href: '/seguridad/auditoria.html', txt: 'Auditoría', roles: ['administrador'] }
