@@ -160,6 +160,60 @@ El acceso se rige por el **principio de privilegio mínimo**, implementado con r
 
 La matriz completa se documenta en [`docs/rbac-matriz.md`](docs/rbac-matriz.md).
 
+### 7.1. Módulo C · Seguridad y acceso
+### Qué incluye
+
+| Parte | Contenido | Dónde |
+|---|---|---|
+| Tablas | `puerta`, `acceso_puerta_log`, `reembolso`, `admin_operacion_audit` y los ajustes de `usuario` | `database/ddl/02_seguridad_usuarios.sql`, `04_seguridad_acceso.sql` |
+| Funciones | `fn_autenticar`, `fn_registrar_usuario`, `fn_validar_entrada`, `fn_reembolsar`, `fn_registrar_auditoria` | `database/ddl/07_seguridad_logica.sql` |
+| Roles y permisos | Cinco roles de PostgreSQL con privilegio mínimo | `database/ddl/08_roles_permisos.sql` |
+| Consulta analítica #4 | Operaciones de administradores del último mes, por administrador | `database/queries/04_auditoria.sql` |
+| Datos de prueba | Puertas y operaciones de auditoría; entradas listas para la demo | `database/seeds/10_seed_seguridad.sql`, `11_demo_checkin.sql` |
+| Pantallas | Check-in en puerta, y auditoría con reembolsos | `app/public/seguridad/checkin.html`, `auditoria.html` |
+| Documentos | Dictamen y riesgos, operación, matriz de roles, modelo y pruebas | `docs/01a-factibilidad-tecnica-riesgos.md`, `05-operacion.md`, `rbac-matriz.md`, `03-diseno/modulo-seguridad.md`, `04-pruebas/seguridad.md` |
+
+### Usuarios de demostración
+
+Todos con la contraseña `Imax2026!` (solo para pruebas locales).
+
+| Correo | Rol | Qué puede usar |
+|---|---|---|
+| `operador@imax.test` | operador_sala | Check-in |
+| `admin@imax.test` | administrador | Auditoría, reembolsos y administración de usuarios |
+| `taquilla@imax.test` | taquillero | Sin acceso a check-in ni auditoría (devuelve 403) |
+| `contador@imax.test` | contador | Sin acceso a check-in ni auditoría (devuelve 403) |
+| `cliente@imax.test` | cliente | Sin acceso a check-in ni auditoría (devuelve 403) |
+
+### Probar el check-in
+
+1. Con la base creada, ejecutar justo antes de la demo `database/seeds/11_demo_checkin.sql`. Devuelve tres códigos `DEMO-...` y la puerta donde usarlos.
+2. Iniciar sesión como `operador@imax.test` y abrir `/seguridad/checkin.html`.
+3. Elegir la puerta y escanear un código: la primera lectura entra y la segunda responde "Entrada ya utilizada". El ingreso solo se permite de 30 minutos antes a 15 minutos después del inicio de la función.
+4. Iniciar sesión como `admin@imax.test` y abrir `/seguridad/auditoria.html` para buscar un boleto, reembolsarlo y ver la operación en la bitácora.
+
+En modo simulado (sin base de datos), el código `IMAX-MOCK-0001` sirve para el check-in y el reembolso.
+
+### Pruebas
+
+    psql -U postgres -d imax -f database/tests/07_checkin_reembolso.sql
+    psql -U postgres -d imax -f database/tests/08_permisos_por_rol.sql
+    psql -U postgres -d imax -f database/explain/04_explain_auditoria.sql
+    python database/tests/doble_escaneo.py 30
+
+Resultados y explicación en `docs/04-pruebas/seguridad.md`.
+
+### Reglas de negocio que garantiza la base de datos
+
+| Regla | Cómo |
+|---|---|
+| RN-09 | Sin columnas de tarjeta ni CVV; la contraseña solo se guarda como hash bcrypt, y la base rechaza otro formato |
+| RN-14 | `fn_validar_entrada` bloquea la fila del boleto y lo marca como usado; con 20 a 50 lecturas simultáneas solo una entra |
+| RN-15 y RN-16 | Se rechaza otra sala, función cancelada o fuera de la ventana de ingreso |
+| RN-17 | Roles de PostgreSQL con privilegio mínimo y validación del rol en el servidor |
+| RN-19 | Reembolso solo por un administrador, con motivo, liberando el asiento; a menos de 2 horas queda como forzado |
+| RN-20 | `admin_operacion_audit` guarda fecha, hora, IP, rol y usuario; está particionada por mes y no admite `UPDATE` ni `DELETE` |
+
 ## 8. Estructura del repositorio
 
 ```
