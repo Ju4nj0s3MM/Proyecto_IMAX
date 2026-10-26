@@ -594,6 +594,8 @@ language sql stable as $$
      where f.estado = 'Activa'
        and f.inicio > now()
        and p.activa and s.activa and ci.activo
+       -- una sala sin asientos activos no tiene nada que vender
+       and exists (select 1 from asiento a where a.sala_id = s.id and a.activo)
        -- rango de fechas escrito así para que se pueda usar el índice de inicio
        and f.inicio >= coalesce(p_fecha::timestamp at time zone 'America/Costa_Rica', now())
        and f.inicio <  coalesce((p_fecha + 1)::timestamp at time zone 'America/Costa_Rica', now() + interval '7 days')

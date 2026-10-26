@@ -15,6 +15,10 @@ const db = {
     { id: 1, cine_id: 1, nombre: 'Sala 1 IMAX Laser', capacidad: 80, minutos_limpieza: 20, activa: true, creado_en: ahora() },
     { id: 2, cine_id: 2, nombre: 'Sala 2', capacidad: 48, minutos_limpieza: 15, activa: true, creado_en: ahora() }
   ],
+  puerta: [
+    { id: 1, sala_id: 1, nombre: 'Tótem 1', activa: true, creado_en: ahora() },
+    { id: 2, sala_id: 2, nombre: 'Tótem 1', activa: true, creado_en: ahora() }
+  ],
   zona_asiento: [
     { id: 1, nombre: 'General', descripcion: 'Butaca estándar' },
     { id: 2, nombre: 'VIP', descripcion: 'Butaca reclinable, zona central' },
@@ -91,6 +95,11 @@ const hora = h => (h == null ? h : String(h).length === 5 ? h + ':00' : String(h
 
 // ---- Restricciones del DDL ----
 const RESTRICCIONES = {
+  puerta: {
+    req: ['sala_id', 'nombre'],
+    unique: [['sala_id', 'nombre']], uqName: ['uq_puerta_sala_nombre'],
+    defaults: { activa: true }
+  },
   cine: {
     req: ['nombre', 'direccion', 'ciudad'],
     unique: [['nombre', 'ciudad']], uqName: ['uq_cine_nombre_ciudad'],
@@ -146,7 +155,7 @@ const RESTRICCIONES = {
 // Qué tablas apuntan a cuál (para simular ON DELETE RESTRICT)
 const REFERENCIAS = {
   cine: [['sala', 'cine_id']],
-  sala: [['asiento', 'sala_id'], ['funcion', 'sala_id']],
+  sala: [['asiento', 'sala_id'], ['funcion', 'sala_id'], ['puerta', 'sala_id']],
   pelicula: [['funcion', 'pelicula_id']],
   zona_asiento: [['asiento', 'zona_asiento_id'], ['tarifa', 'zona_asiento_id']],
   tipo_entrada: [['tarifa', 'tipo_entrada_id'], ['promocion', 'tipo_entrada_id']],
@@ -219,6 +228,7 @@ function borrar(tabla, id) {
 const RECURSOS = {
   cines: { tabla: 'cine', cols: ['nombre', 'direccion', 'ciudad', 'pais', 'latitud', 'longitud', 'activo'] },
   salas: { tabla: 'sala', cols: ['cine_id', 'nombre', 'capacidad', 'minutos_limpieza', 'activa'] },
+  puertas: { tabla: 'puerta', cols: ['sala_id', 'nombre', 'activa'] },
   zonas: { tabla: 'zona_asiento', cols: ['nombre', 'descripcion'] },
   clasificaciones: { tabla: 'clasificacion', cols: ['codigo', 'descripcion', 'edad_minima'] },
   generos: { tabla: 'genero', cols: ['nombre'] },
@@ -235,8 +245,13 @@ const VISTAS = {
   salas: () => db.sala.map(s => {
     const c = db.cine.find(x => x.id === s.cine_id) || {};
     const as = db.asiento.filter(a => a.sala_id === s.id);
-    return { ...s, cine: c.nombre, ciudad: c.ciudad, asientos_activos: as.filter(a => a.activo).length, asientos_total: as.length };
+    return { ...s, cine: c.nombre, ciudad: c.ciudad, asientos_activos: as.filter(a => a.activo).length, asientos_total: as.length,
+             puertas: db.puerta.filter(p => p.sala_id === s.id && p.activa).length };
   }).sort((a, b) => (a.cine + a.nombre).localeCompare(b.cine + b.nombre)),
+  puertas: () => db.puerta.map(p => {
+    const s = db.sala.find(x => x.id === p.sala_id) || {};
+    return { ...p, sala: s.nombre, cine: (db.cine.find(x => x.id === s.cine_id) || {}).nombre };
+  }).sort((a, b) => (a.cine + a.sala + a.nombre).localeCompare(b.cine + b.sala + b.nombre)),
   zonas: () => db.zona_asiento.map(z => ({ ...z, asientos: db.asiento.filter(a => a.zona_asiento_id === z.id).length }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre)),
   clasificaciones: () => [...db.clasificacion].sort((a, b) => a.edad_minima - b.edad_minima || a.codigo.localeCompare(b.codigo)),
