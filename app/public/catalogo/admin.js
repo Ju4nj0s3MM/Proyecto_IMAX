@@ -10,7 +10,7 @@ const fallo = e => mostrarMensaje(msg, e.message || e, 'err');
 const estado = (v, fem) => v ? `<span class="pill si">Activ${fem ? 'a' : 'o'}</span>` : `<span class="pill no">Inactiv${fem ? 'a' : 'o'}</span>`;
 
 // Datos cargados de la API
-const D = { peliculas: [], cines: [], salas: [], zonas: [], clasificaciones: [], generos: [],
+const D = { peliculas: [], cines: [], salas: [], puertas: [], zonas: [], clasificaciones: [], generos: [],
             funciones: [], tipos: [], tarifas: [], promociones: [] };
 
 // Días según ISO (1 = lunes … 7 = domingo), igual que extract(isodow from ...) en PostgreSQL
@@ -90,10 +90,24 @@ const SECCIONES = {
       { t: 'Asientos activos', v: s => s.asientos_activos === s.capacidad
           ? `${s.asientos_activos}`
           : `<span class="aviso" title="No coincide con la capacidad declarada">${s.asientos_activos ?? 0} ⚠</span>` },
+      { t: 'Puertas', v: s => s.puertas ? `${s.puertas}` : '<span class="aviso" title="Sin puertas no se puede hacer check-in">0 ⚠</span>' },
       { t: 'Limpieza', v: s => `${s.minutos_limpieza} min` },
       { t: 'Estado', v: s => estado(s.activa, true) }
     ],
     extra: s => `<button class="secondary chico" data-asientos="${s.id}">Asientos</button>`
+  },
+  puertas: {
+    singular: 'puerta', plural: 'Puertas de check-in',
+    campos: [
+      { k: 'sala_id', l: 'Sala', type: 'select', req: true, ancho: 2, opts: () => opciones(D.salas, s => `${s.cine} · ${s.nombre}`) },
+      { k: 'nombre', l: 'Nombre', req: true, max: 60, def: 'Tótem 1' },
+      { k: 'activa', l: 'Activa', type: 'checkbox', def: true }
+    ],
+    columnas: [
+      { t: 'Cine · Sala', v: p => `${esc(p.cine)}<div class="muted">${esc(p.sala)}</div>` },
+      { t: 'Puerta', v: p => `<strong>${esc(p.nombre)}</strong>` },
+      { t: 'Estado', v: p => estado(p.activa, true) }
+    ]
   },
   zonas: {
     singular: 'zona', plural: 'Zonas de asiento',

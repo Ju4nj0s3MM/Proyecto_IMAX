@@ -226,6 +226,8 @@ npm run dev        # inicia el servidor en http://localhost:3000
 
 La terminal debe indicar `MOCK=false`. Usuarios de demostración (contraseña `Imax2026!`): `cliente@imax.test`, `taquilla@imax.test`, `operador@imax.test`, `contador@imax.test` y `admin@imax.test`.
 
+Para probar el check-in, el seed deja una función en la Sala 1 de San José que empieza 20 minutos después de cargarlo, con las entradas `IMAX-DEMO-1` e `IMAX-DEMO-2`. Si ya pasó la hora, se vuelve a correr `psql -U postgres -d imax -f database/seeds/13_demo_checkin.sql`.
+
 Sin base de datos, con `MOCK=true`, la aplicación responde datos de ejemplo y permite **"Entrar como rol"** en la pantalla de inicio de sesión.
 
 > En PowerShell, si aparece el error de ejecución de scripts, ejecutar una vez `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` o utilizar `npm.cmd`.

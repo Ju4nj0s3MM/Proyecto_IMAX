@@ -233,9 +233,10 @@ Las tablas de bitácora llevan la fecha dentro de la llave primaria (`id`, `fech
 
 | Script | Contenido |
 |---|---|
-| `01_catalogo_demo.sql` | 3 cines, 4 salas, 128 asientos, 8 funciones, tarifas, promociones y un usuario por rol |
+| `01_catalogo_demo.sql` | 3 cines, 4 salas, 228 asientos, 8 funciones, tarifas, promociones y un usuario por rol |
 | `10_metodos_pago.sql` | Los tres métodos de pago simulados |
 | `10_seed_seguridad.sql` | Puertas y operaciones de auditoría de ejemplo |
 | `11_seed_venta.sql` | 6 órdenes: 3 pagadas, 1 rechazada, 1 vencida y 1 con bloqueo vigente |
 | `12_masivo_catalogo.sql` | Unas 900 000 funciones, 1 500 salas y 270 000 asientos para medir rendimiento |
+| `13_demo_checkin.sql` | Una función que empieza en 20 minutos y dos entradas con QR fijo (`IMAX-DEMO-1` e `IMAX-DEMO-2`) para probar el check-in |
 | `14_masivo_venta.sql` | Unas 726 000 órdenes pagadas y más de 2 millones de boletos |

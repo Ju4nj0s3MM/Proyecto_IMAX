@@ -32,7 +32,7 @@ select c.id, s.nombre, s.capacidad, s.limpieza
                ('IMAX Ciudad de México', 'Sala Premium', 40, 30)) s(cine, nombre, capacidad, limpieza)
   join cine c on c.nombre = s.cine;
 
--- Asientos: filas A..H × 10 (A-C VIP, H accesible) para la sala de Los Ángeles; el resto todo General.
+-- Asientos: filas A..H × 10 (A-C VIP, H accesible) para la sala de Los Ángeles; Sala Premium todo VIP y el resto General.
 insert into asiento (sala_id, zona_asiento_id, fila, numero)
 select s.id,
        (select id from zona_asiento where nombre = case when f <= 3 then 'VIP' when f = 8 then 'Accesible' else 'General' end),
@@ -44,6 +44,16 @@ insert into asiento (sala_id, zona_asiento_id, fila, numero)
 select s.id, (select id from zona_asiento where nombre = 'General'), chr(64 + f), n
   from sala s join cine c on c.id = s.cine_id, generate_series(1, 6) f, generate_series(1, 8) n
  where c.nombre = 'IMAX San José' and s.nombre = 'Sala 1';
+
+insert into asiento (sala_id, zona_asiento_id, fila, numero)
+select s.id, (select id from zona_asiento where nombre = 'General'), chr(64 + f), n
+  from sala s join cine c on c.id = s.cine_id, generate_series(1, 6) f, generate_series(1, 10) n
+ where c.nombre = 'IMAX San José' and s.nombre = 'Sala 2';
+
+insert into asiento (sala_id, zona_asiento_id, fila, numero)
+select s.id, (select id from zona_asiento where nombre = 'VIP'), chr(64 + f), n
+  from sala s, generate_series(1, 4) f, generate_series(1, 10) n
+ where s.nombre = 'Sala Premium';
 
 insert into pelicula (titulo, sinopsis, duracion_min, clasificacion_id, fecha_estreno)
 select p.titulo, p.sinopsis, p.duracion, c.id, p.estreno::date

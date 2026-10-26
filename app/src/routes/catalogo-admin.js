@@ -49,6 +49,7 @@ router.delete('/:recurso/:id', recurso, wrap(async (req, res) => { await repo().
 const MENSAJES = {
   uq_cine_nombre_ciudad: 'Ya existe un cine con ese nombre en esa ciudad.',
   uq_sala_cine_nombre: 'Ese cine ya tiene una sala con ese nombre.',
+  uq_puerta_sala_nombre: 'Esa sala ya tiene una puerta con ese nombre.',
   uq_asiento_sala_fila_numero: 'La sala ya tiene asientos. Marca "reemplazar" para regenerar el mapa.',
   zona_asiento_nombre_key: 'Ya existe una zona con ese nombre.',
   clasificacion_codigo_key: 'Ya existe una clasificación con ese código.',
@@ -76,7 +77,8 @@ const MENSAJES = {
   ck_promocion_condicion: 'La promoción necesita una condición: un día de la semana o exigir cantidad par de entradas.'
 };
 const TABLAS = { sala: 'salas', asiento: 'asientos', pelicula: 'películas', pelicula_genero: 'películas', funcion: 'funciones',
-                 tarifa: 'tarifas', promocion: 'promociones', boleto: 'boletos' };
+                 tarifa: 'tarifas', promocion: 'promociones', boleto: 'boletos', puerta: 'puertas',
+                 acceso_puerta_log: 'lecturas de check-in', reserva_asiento: 'reservas', orden: 'órdenes' };
 
 router.use((err, req, res, next) => {
   const porConstraint = MENSAJES[err.constraint];
@@ -85,9 +87,10 @@ router.use((err, req, res, next) => {
     case '23505': return res.status(409).json({ error: porConstraint || 'Ya existe un registro con esos datos.' });
     case '23514': return res.status(400).json({ error: porConstraint || 'Algún valor no cumple las reglas de la tabla.' });
     case '23502': return res.status(400).json({ error: `Falta el campo obligatorio: ${err.column}.` });
+    case '23001':   // on delete restrict
     case '23503': {
       const t = /table "(\w+)"/.exec(err.detail || '');
-      if (t && /still referenced/.test(err.detail)) {
+      if (t && /referenced from/.test(err.detail)) {
         return res.status(409).json({ error: `No se puede eliminar: todavía hay ${TABLAS[t[1]] || t[1]} que lo usan. Desactívalo en su lugar.` });
       }
       return res.status(409).json({ error: 'Hace referencia a un registro que no existe.' });

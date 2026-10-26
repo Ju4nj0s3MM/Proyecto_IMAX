@@ -15,9 +15,18 @@ const RECURSOS = {
     cols: ['cine_id', 'nombre', 'capacidad', 'minutos_limpieza', 'activa'],
     select: `select s.*, c.nombre as cine, c.ciudad,
                     (select count(*) from asiento a where a.sala_id = s.id and a.activo)::int as asientos_activos,
-                    (select count(*) from asiento a where a.sala_id = s.id)::int as asientos_total
+                    (select count(*) from asiento a where a.sala_id = s.id)::int as asientos_total,
+                    (select count(*) from puerta p where p.sala_id = s.id and p.activa)::int as puertas
                from sala s join cine c on c.id = s.cine_id
               order by c.nombre, s.nombre`
+  },
+  // puertas de cada sala para el check-in (tabla de 04_seguridad_acceso.sql)
+  puertas: {
+    tabla: 'puerta',
+    cols: ['sala_id', 'nombre', 'activa'],
+    select: `select p.*, s.nombre as sala, c.nombre as cine
+               from puerta p join sala s on s.id = p.sala_id join cine c on c.id = s.cine_id
+              order by c.nombre, s.nombre, p.nombre`
   },
   zonas: {
     tabla: 'zona_asiento',

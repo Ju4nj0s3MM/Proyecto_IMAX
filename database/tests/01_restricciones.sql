@@ -272,9 +272,11 @@ from fn_mapa_asientos(1) where asiento_id in (1, 2, 3) order by asiento_id;
 select estado, count(*) from fn_mapa_asientos(1) group by estado order by estado;
 
 -- Prueba 4: un asiento desactivado ya no aparece en el mapa
--- Resultado esperado: 79 asientos
-update asiento set activo = false where id = 80;
-select count(*) from fn_mapa_asientos(1);
+-- Se hace en la función 6 (Sala 1 de San José, 48 asientos, ids 81 a 128): la sala de la función 1
+-- ya tiene reservas y RN-18 no deja cambiar sus asientos
+-- Resultado esperado: 47 asientos
+update asiento set activo = false where id = 128;
+select count(*) from fn_mapa_asientos(6);
 
 -- Prueba 5: función que no existe
 -- Resultado esperado: 0 filas
