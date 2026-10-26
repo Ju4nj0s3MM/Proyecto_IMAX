@@ -1,7 +1,8 @@
 """Prueba de concurrencia: N lecturas simultáneas del mismo QR en la puerta.
 
 Resultado esperado: exactamente una lectura exitosa; el resto "Entrada ya utilizada".
-Conexión: variables PGHOST, PGPORT, PGUSER, PGPASSWORD y PGDATABASE (o DATABASE_URL).
+Conexión por defecto: localhost:5432, usuario postgres, contraseña postgres y base imax.
+Se puede cambiar con las variables PGHOST, PGPORT, PGUSER, PGPASSWORD y PGDATABASE.
 Uso: python database/tests/doble_escaneo.py [hilos]
 """
 import os
@@ -16,8 +17,12 @@ HILOS = int(sys.argv[1]) if len(sys.argv) > 1 else 30
 
 
 def conectar():
-    dsn = os.environ.get("DATABASE_URL")
-    conn = psycopg2.connect(dsn) if dsn else psycopg2.connect("")
+    conn = psycopg2.connect(
+        host=os.environ.get("PGHOST", "localhost"),
+        port=os.environ.get("PGPORT", "5432"),
+        user=os.environ.get("PGUSER", "postgres"),
+        password=os.environ.get("PGPASSWORD", "postgres"),
+        dbname=os.environ.get("PGDATABASE", "imax"))
     conn.autocommit = True
     return conn
 
