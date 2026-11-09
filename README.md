@@ -369,3 +369,10 @@ Lanza 30 clientes que bloquean el mismo asiento a la vez y 10 pagos simultáneos
 Proyecto académico · Instituto Tecnológico de Costa Rica · II Semestre 2026
 
 </div>
+
+
+
+
+
+VIDEO DE REVISIÓN:
+https://drive.google.com/file/d/1iDTko467qJZYQHQTxn7rrxIuMwV1lZOH/view?usp=sharing
